@@ -113,9 +113,9 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
             ),
             const SizedBox(height: 8),
             if (_selectedMainArea != null && _subAreaOptions.isNotEmpty) ...[
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
+                children: [
                   Text('하위 지역 필터'),
                 ],
               ),
@@ -166,11 +166,19 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                     child: ElevatedButton(
                       onPressed: () async {
                         FocusScope.of(context).unfocus();
+                        notifier.setShipList([]);
+                        // 🔴 상태 시작 시 로딩
+                        ref.read(shipListProvider.notifier).state = ref
+                            .read(shipListProvider.notifier)
+                            .state
+                            .copyWith(isLoading: true);
+
                         final allShips = <Ship>[];
                         for (final area in _selectedSubAreas) {
                           final ships = await notifier.fetchOnlyDirect(area);
                           allShips.addAll(ships);
                         }
+
                         notifier.setShipList(allShips);
                       },
                       child: const Text('필터 적용'),
@@ -201,45 +209,59 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
               ],
             ),
             const SizedBox(height: 12),
-            Text('${state.ships.length}척의 예약가능한 선박이 검색됨',
-                style: const TextStyle(fontSize: 14)),
-            const SizedBox(height: 16),
-            if (state.isLoading)
-              const CircularProgressIndicator()
-            else if (state.ships.isEmpty)
-              const Text('결과 없음')
-            else
-              Expanded(
-                child: ListView.builder(
-                  itemCount: state.ships.length,
-                  itemBuilder: (_, i) {
-                    final s = state.ships[i];
-                    final sdate =
-                        "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
-                    final url =
-                        'https://www.sunsang24.com/ship/list/?ship_no=${s.shipNo}&sdate=$sdate';
-
-                    return Card(
-                      child: ListTile(
-                        title: Text(
-                            '${i + 1}. ${s.name} (${s.areaMain} ${s.areaSub})'),
-                        subtitle: Text('${s.fishType} / 남은자리: ${s.remain}'),
-                        onTap: () async {
-                          final uri = Uri.parse(url);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri,
-                                mode: LaunchMode.externalApplication);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('브라우저를 열 수 없습니다.')),
-                            );
-                          }
-                        },
-                      ),
-                    );
-                  },
+            Row(
+              children: [
+                Text('${state.ships.length}척의 예약가능한 선박이 검색됨',
+                    style: const TextStyle(fontSize: 14)),
+                const SizedBox(width: 8),
+                Icon(
+                  state.isLoading ? Icons.circle : Icons.check_circle,
+                  color: state.isLoading ? Colors.red : Colors.green,
+                  size: 16,
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: Center(
+                child: state.isLoading
+                    ? const CircularProgressIndicator()
+                    : state.ships.isEmpty
+                        ? const Text('결과 없음')
+                        : ListView.builder(
+                            itemCount: state.ships.length,
+                            itemBuilder: (_, i) {
+                              final s = state.ships[i];
+                              final sdate =
+                                  "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
+                              final url =
+                                  'https://www.sunsang24.com/ship/list/?ship_no=${s.shipNo}&sdate=$sdate';
+
+                              return Card(
+                                child: ListTile(
+                                  title: Text(
+                                      '${i + 1}. ${s.name} (${s.areaMain} ${s.areaSub})'),
+                                  subtitle:
+                                      Text('${s.fishType} / 남은자리: ${s.remain}'),
+                                  onTap: () async {
+                                    final uri = Uri.parse(url);
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(uri,
+                                          mode: LaunchMode.externalApplication);
+                                    } else {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text('브라우저를 열 수 없습니다.')),
+                                      );
+                                    }
+                                  },
+                                ),
+                              );
+                            },
+                          ),
               ),
+            ),
           ],
         ),
       ),
