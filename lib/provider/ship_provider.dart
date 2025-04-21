@@ -61,7 +61,7 @@ class ShipListNotifier extends StateNotifier<ShipListState> {
   }
 
   void reset() {
-    state = ShipListState.initial();
+    state = state.copyWith(ships: [], isLoading: false);
   }
 
   Future<List<String>> getAllMainAreas() async {

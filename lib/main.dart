@@ -67,6 +67,19 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
       _selectedSubAreas = _subAreaOptions.toSet();
       _allSelected = true;
     });
+    notifier.reset();
+  }
+
+  void _resetState(ShipListNotifier notifier) {
+    notifier.reset();
+    setState(() {
+      _selectedMainArea = null;
+      _mainAreaOptions.clear();
+      _subAreaOptions.clear();
+      _selectedSubAreas.clear();
+      _allSelected = true;
+    });
+    _loadMainAreas();
   }
 
   @override
@@ -102,19 +115,8 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
             if (_selectedMainArea != null && _subAreaOptions.isNotEmpty) ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('하위 지역 필터'),
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedMainArea = null;
-                        _subAreaOptions.clear();
-                        _selectedSubAreas.clear();
-                        _allSelected = true;
-                      });
-                    },
-                    child: const Text('초기화'),
-                  ),
+                children: const [
+                  Text('하위 지역 필터'),
                 ],
               ),
               Wrap(
@@ -157,29 +159,40 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                   }),
                 ],
               ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () async {
-                  FocusScope.of(context).unfocus();
-                  final allShips = <Ship>[];
-                  for (final area in _selectedSubAreas) {
-                    final ships = await notifier.fetchOnlyDirect(area);
-                    allShips.addAll(ships);
-                  }
-                  setState(() {
-                    ref.read(shipListProvider.notifier).setShipList(allShips);
-                  });
-                },
-                child: const Text('필터 적용'),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        FocusScope.of(context).unfocus();
+                        final allShips = <Ship>[];
+                        for (final area in _selectedSubAreas) {
+                          final ships = await notifier.fetchOnlyDirect(area);
+                          allShips.addAll(ships);
+                        }
+                        notifier.setShipList(allShips);
+                      },
+                      child: const Text('필터 적용'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _resetState(notifier),
+                    child: const Text('초기화'),
+                  ),
+                ],
               ),
             ],
             const SizedBox(height: 12),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  "선택된 날짜: ${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
-                  style: const TextStyle(fontSize: 14),
+                Expanded(
+                  child: Text(
+                    "선택된 날짜: ${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
+                    style: const TextStyle(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 TextButton(
                   onPressed: _selectDate,
