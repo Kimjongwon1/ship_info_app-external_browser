@@ -255,4 +255,80 @@ class ShipService {
       return [];
     }
   }
+
+  static Future<List<Ship>> fetchAllWithMain(
+      String mainAreaText, String subAreaText) async {
+    try {
+      // 1) filter_area API에서 mainArea 찾기
+      final areaRes = await http.get(
+        Uri.parse('https://api.sunsang24.com/ship/filter_area/general'),
+      );
+      final rawAreas = jsonDecode(areaRes.body)['area'] as List<dynamic>? ?? [];
+
+      Map<String, dynamic>? targetRegion;
+      for (final region in rawAreas) {
+        final title = region['title']?.toString().toLowerCase() ?? '';
+        if (title == mainAreaText.toLowerCase()) {
+          targetRegion = region;
+          break;
+        }
+      }
+      if (targetRegion == null) return [];
+
+      // 2) 그 region 안에서 subAreaText와 정확히 일치하는 sub item 찾기
+      final items =
+          (targetRegion['items'] as List<dynamic>).cast<Map<String, dynamic>>();
+      final matched = items.firstWhere(
+        (item) =>
+            (item['name']?.toString().toLowerCase() ?? '') ==
+            subAreaText.toLowerCase(),
+        orElse: () => {},
+      );
+      if (matched.isEmpty) return [];
+
+      final areaCode =
+          matched['area']?.toString() ?? matched['no']?.toString() ?? '';
+      final areaName = matched['name']?.toString() ?? subAreaText;
+
+      // 3) 선박 리스트 조회 (기존 fetchAll 로직과 동일)
+      List<Ship> allShips = [];
+      int page = 1;
+      while (true) {
+        final uri = Uri.parse('https://api.sunsang24.com/ship/list').replace(
+          queryParameters: {
+            'area': areaCode,
+            'area_text': areaName,
+            'area_type': 'area',
+            'page': '$page',
+            'type': 'general',
+          },
+        );
+        final res = await http.get(uri);
+        final list = jsonDecode(res.body)['list'] as List<dynamic>? ?? [];
+
+        final ships = list
+            .where((s) =>
+                s['remain_embarkation_num'] != null &&
+                s['remain_embarkation_num'] > 0)
+            .map<Ship>((s) => Ship.fromJson({
+                  'shipNo': s['ship']?['no'] ?? 0,
+                  'name': s['ship']?['name'] ?? '이름없음',
+                  'areaMain': s['ship']?['area_main'] ?? '지역미정',
+                  'areaSub': s['ship']?['area_sub'] ?? '지역미정',
+                  'fishType': s['fish_type'] ?? '어종 미상',
+                  'remain': s['remain_embarkation_num'],
+                }))
+            .toList();
+
+        allShips.addAll(ships);
+        if (ships.length < 20) break;
+        page++;
+      }
+
+      return allShips;
+    } catch (e) {
+      debugPrint('❌ fetchAllWithMain 오류: $e');
+      return [];
+    }
+  }
 }

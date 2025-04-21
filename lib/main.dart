@@ -39,10 +39,8 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
   Future<void> _loadMainAreas() async {
     final notifier = ref.read(shipListProvider.notifier);
     final areas = await notifier.getAllMainAreas();
-    debugPrint('✅ 메인 지역 목록 로드: $areas');
     setState(() {
       _mainAreaOptions = areas;
-      debugPrint('✅ 상태 반영: _mainAreaOptions = $areas');
     });
   }
 
@@ -63,7 +61,8 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
     final subAreas = await notifier.getSubAreasForMain(mainArea);
     setState(() {
       _selectedMainArea = mainArea;
-      _subAreaOptions = subAreas.where((e) => e != '전체').toList();
+      _subAreaOptions =
+          subAreas.where((e) => e.isNotEmpty && e != '전체').toList();
       _selectedSubAreas = _subAreaOptions.toSet();
       _allSelected = true;
     });
@@ -105,7 +104,6 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                 );
               }).toList(),
               onChanged: (area) async {
-                debugPrint('✅ 선택된 메인 지역: $area');
                 if (area != null) {
                   await _loadSubAreas(area, ref);
                 }
@@ -167,18 +165,15 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                       onPressed: () async {
                         FocusScope.of(context).unfocus();
                         notifier.setShipList([]);
-                        // 🔴 상태 시작 시 로딩
-                        ref.read(shipListProvider.notifier).state = ref
-                            .read(shipListProvider.notifier)
-                            .state
-                            .copyWith(isLoading: true);
+                        ref.read(shipListProvider.notifier).state =
+                            state.copyWith(ships: [], isLoading: true);
 
                         final allShips = <Ship>[];
                         for (final area in _selectedSubAreas) {
-                          final ships = await notifier.fetchOnlyDirect(area);
+                          final ships = await notifier.fetchOnlyDirectWithMain(
+                              area, _selectedMainArea!);
                           allShips.addAll(ships);
                         }
-
                         notifier.setShipList(allShips);
                       },
                       child: const Text('필터 적용'),
@@ -192,22 +187,6 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                 ],
               ),
             ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    "선택된 날짜: ${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
-                    style: const TextStyle(fontSize: 14),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                TextButton(
-                  onPressed: _selectDate,
-                  child: const Text("날짜 선택"),
-                ),
-              ],
-            ),
             const SizedBox(height: 12),
             Row(
               children: [
