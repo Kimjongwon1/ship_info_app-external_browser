@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'model/ship.dart';
 import 'provider/ship_provider.dart';
 
 void main() => runApp(
@@ -25,8 +26,12 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
   DateTime selectedDate = DateTime.now();
 
   bool _isRegionSearched = false;
-  String? _regionMainTitle; // ✅ 대지역 이름
-  bool _isMainRegion = false; // ✅ 대지역 여부
+  String? _regionMainTitle;
+  bool _isMainRegion = false;
+
+  List<String> _subAreaOptions = [];
+  Set<String> _selectedSubAreas = {};
+  bool _allSelected = true;
 
   Future<void> _selectDate() async {
     final picked = await showDatePicker(
@@ -65,14 +70,13 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                             _isRegionSearched = false;
                             _regionMainTitle = null;
                             _isMainRegion = false;
+                            _subAreaOptions.clear();
+                            _selectedSubAreas.clear();
                           });
                         },
                       )
                     : null,
               ),
-              onSubmitted: (_) {
-                FocusScope.of(context).unfocus();
-              },
             ),
             const SizedBox(height: 8),
             Row(
@@ -98,12 +102,29 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                       final mainTitle = await notifier
                           .getAreaMainTitle(regionController.text);
 
-                      // ✅ 입력과 메인타이틀이 같으면 대지역이다
                       final inputNorm = regionController.text
                           .toLowerCase()
                           .replaceAll(' ', '');
                       final mainNorm =
                           (mainTitle ?? '').toLowerCase().replaceAll(' ', '');
+
+                      if (inputNorm == mainNorm) {
+                        final subAreas = (await notifier
+                                .getSubAreasForMain(regionController.text))
+                            .where((s) => s != '전체')
+                            .toList();
+                        setState(() {
+                          _subAreaOptions = subAreas;
+                          _selectedSubAreas = subAreas.toSet();
+                          _allSelected = true;
+                        });
+                      } else {
+                        setState(() {
+                          _subAreaOptions.clear();
+                          _selectedSubAreas.clear();
+                          _allSelected = false;
+                        });
+                      }
 
                       setState(() {
                         _isRegionSearched = true;
@@ -115,27 +136,84 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isRegionSearched && !_isMainRegion
-                        ? () async {
-                            FocusScope.of(context).unfocus();
-                            final (mainTitle, _) = await notifier
-                                .fetchAllBySubArea(regionController.text);
-                            setState(() {
-                              _regionMainTitle = mainTitle;
-                            });
-                          }
-                        : null,
-                    child: Text(
-                      _regionMainTitle != null && !_isMainRegion
-                          ? '${_regionMainTitle!} 전체'
-                          : '전체',
+                if (_isRegionSearched && !_isMainRegion)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        FocusScope.of(context).unfocus();
+                        final (mainTitle, _) = await notifier
+                            .fetchAllBySubArea(regionController.text);
+                        setState(() {
+                          _regionMainTitle = mainTitle;
+                        });
+                      },
+                      child: Text(
+                        _regionMainTitle != null
+                            ? '${_regionMainTitle!} 전체'
+                            : '전체',
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
+            if (_isMainRegion && _subAreaOptions.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  if (_subAreaOptions.length > 1)
+                    FilterChip(
+                      label: const Text('하위 전체 선택'),
+                      selected: _allSelected,
+                      onSelected: (_) {
+                        setState(() {
+                          if (_allSelected) {
+                            _selectedSubAreas.clear();
+                            _allSelected = false;
+                          } else {
+                            _selectedSubAreas = _subAreaOptions.toSet();
+                            _allSelected = true;
+                          }
+                        });
+                      },
+                    ),
+                  ..._subAreaOptions.map((area) {
+                    final isSelected = _selectedSubAreas.contains(area);
+                    return FilterChip(
+                      label: Text(area),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedSubAreas.add(area);
+                          } else {
+                            _selectedSubAreas.remove(area);
+                          }
+                          _allSelected = _selectedSubAreas.length ==
+                              _subAreaOptions.length;
+                        });
+                      },
+                    );
+                  }),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () async {
+                  FocusScope.of(context).unfocus();
+                  final allShips = <Ship>[];
+                  for (final area in _selectedSubAreas) {
+                    final ships = await notifier.fetchOnlyDirect(area);
+                    allShips.addAll(ships);
+                  }
+                  setState(() {
+                    ref.read(shipListProvider.notifier).setShipList(allShips);
+                  });
+                },
+                child: const Text('필터 적용'),
+              ),
+            ],
             const SizedBox(height: 12),
             Text('${state.ships.length}척의 예약가능한 선박이 검색됨',
                 style: const TextStyle(fontSize: 14)),

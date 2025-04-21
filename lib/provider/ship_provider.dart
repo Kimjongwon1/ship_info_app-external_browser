@@ -13,13 +13,11 @@ class ShipListNotifier extends StateNotifier<ShipListState> {
     try {
       final ships = await ShipService.fetchAll(regionText);
 
-      // ✅ 여수처럼 정확한 지역명으로 검색 결과가 있으면 그걸로 사용
       if (ships.isNotEmpty) {
         state = state.copyWith(ships: ships, isLoading: false);
         return;
       }
 
-      // ❗ 검색 결과가 없을 경우 → 대지역 전체 검색 fallback
       final (mainTitle, fullShips) =
           await ShipService.fetchBySubArea(regionText);
 
@@ -30,6 +28,10 @@ class ShipListNotifier extends StateNotifier<ShipListState> {
     }
   }
 
+  Future<List<Ship>> fetchOnlyDirect(String regionText) async {
+    return await ShipService.fetchAll(regionText);
+  }
+
   Future<String?> getAreaMainTitle(String regionText) async {
     try {
       return await ShipService.getMainTitleFromSubArea(regionText);
@@ -38,16 +40,24 @@ class ShipListNotifier extends StateNotifier<ShipListState> {
     }
   }
 
+  Future<List<String>> getSubAreasForMain(String mainTitle) async {
+    return await ShipService.getSubAreasForMain(mainTitle);
+  }
+
   Future<(String?, List<Ship>)> fetchAllBySubArea(String subAreaText) async {
     state = state.copyWith(isLoading: true);
     try {
       final (title, ships) = await ShipService.fetchBySubArea(subAreaText);
       state = state.copyWith(ships: ships, isLoading: false);
-      return (title, ships); // ✅ 반드시 record 타입으로 반환해야 함
+      return (title, ships);
     } catch (_) {
       state = state.copyWith(isLoading: false);
-      return (null, <Ship>[]); // ✅ 여기도 record 타입 맞춰야 함
+      return (null, <Ship>[]);
     }
+  }
+
+  void setShipList(List<Ship> ships) {
+    state = state.copyWith(ships: ships, isLoading: false);
   }
 
   void reset() {

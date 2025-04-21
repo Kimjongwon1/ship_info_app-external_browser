@@ -209,4 +209,30 @@ class ShipService {
       return null;
     }
   }
+
+  static Future<List<String>> getSubAreasForMain(String mainTitle) async {
+    try {
+      final areaRes = await http.get(
+        Uri.parse('https://api.sunsang24.com/ship/filter_area/general'),
+      );
+
+      final rawAreas = jsonDecode(areaRes.body)['area'] ?? [];
+
+      for (final region in rawAreas) {
+        final title = region['title']?.toString() ?? '';
+        if (title.contains(mainTitle)) {
+          final items = region['items'] as List<dynamic>? ?? [];
+          return items
+              .map((item) => item['name']?.toString())
+              .whereType<String>()
+              .toList();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('❌ getSubAreasForMain 오류: $e');
+      return [];
+    }
+  }
 }
