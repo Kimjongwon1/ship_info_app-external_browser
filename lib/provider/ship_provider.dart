@@ -63,6 +63,15 @@ class ShipListNotifier extends StateNotifier<ShipListState> {
   void reset() {
     state = ShipListState.initial();
   }
+
+  Future<List<String>> getAllMainAreas() async {
+    try {
+      final res = await ShipService.getAllMainAreaTitles();
+      return res;
+    } catch (_) {
+      return [];
+    }
+  }
 }
 
 final shipListProvider =

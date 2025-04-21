@@ -22,16 +22,29 @@ class ShipListPage extends ConsumerStatefulWidget {
 }
 
 class _ShipListPageState extends ConsumerState<ShipListPage> {
-  final regionController = TextEditingController();
+  @override
+  void initState() {
+    super.initState();
+    _loadMainAreas();
+  }
+
   DateTime selectedDate = DateTime.now();
 
-  bool _isRegionSearched = false;
-  String? _regionMainTitle;
-  bool _isMainRegion = false;
-
+  String? _selectedMainArea;
+  List<String> _mainAreaOptions = [];
   List<String> _subAreaOptions = [];
   Set<String> _selectedSubAreas = {};
   bool _allSelected = true;
+
+  Future<void> _loadMainAreas() async {
+    final notifier = ref.read(shipListProvider.notifier);
+    final areas = await notifier.getAllMainAreas();
+    debugPrint('✅ 메인 지역 목록 로드: $areas');
+    setState(() {
+      _mainAreaOptions = areas;
+      debugPrint('✅ 상태 반영: _mainAreaOptions = $areas');
+    });
+  }
 
   Future<void> _selectDate() async {
     final picked = await showDatePicker(
@@ -45,6 +58,17 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
     }
   }
 
+  Future<void> _loadSubAreas(String mainArea, WidgetRef ref) async {
+    final notifier = ref.read(shipListProvider.notifier);
+    final subAreas = await notifier.getSubAreasForMain(mainArea);
+    setState(() {
+      _selectedMainArea = mainArea;
+      _subAreaOptions = subAreas.where((e) => e != '전체').toList();
+      _selectedSubAreas = _subAreaOptions.toSet();
+      _allSelected = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(shipListProvider);
@@ -55,109 +79,44 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: regionController,
-              decoration: InputDecoration(
-                labelText: '지역 입력 (예: 여수)',
-                suffixIcon: regionController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          regionController.clear();
-                          notifier.reset();
-                          setState(() {
-                            _isRegionSearched = false;
-                            _regionMainTitle = null;
-                            _isMainRegion = false;
-                            _subAreaOptions.clear();
-                            _selectedSubAreas.clear();
-                          });
-                        },
-                      )
-                    : null,
-              ),
+            DropdownButton<String>(
+              value: _selectedMainArea,
+              hint: const Text('메인 지역 선택'),
+              isExpanded: true,
+              items: _mainAreaOptions.map((area) {
+                return DropdownMenuItem<String>(
+                  value: area,
+                  child: Text(area),
+                );
+              }).toList(),
+              onChanged: (area) async {
+                debugPrint('✅ 선택된 메인 지역: $area');
+                if (area != null) {
+                  await _loadSubAreas(area, ref);
+                }
+              },
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "선택된 날짜: ${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
-                  style: const TextStyle(fontSize: 14),
-                ),
-                TextButton(
-                  onPressed: _selectDate,
-                  child: const Text("날짜 선택"),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      FocusScope.of(context).unfocus();
-                      await notifier.fetchOnly(regionController.text);
-                      final mainTitle = await notifier
-                          .getAreaMainTitle(regionController.text);
-
-                      final inputNorm = regionController.text
-                          .toLowerCase()
-                          .replaceAll(' ', '');
-                      final mainNorm =
-                          (mainTitle ?? '').toLowerCase().replaceAll(' ', '');
-
-                      if (inputNorm == mainNorm) {
-                        final subAreas = (await notifier
-                                .getSubAreasForMain(regionController.text))
-                            .where((s) => s != '전체')
-                            .toList();
-                        setState(() {
-                          _subAreaOptions = subAreas;
-                          _selectedSubAreas = subAreas.toSet();
-                          _allSelected = true;
-                        });
-                      } else {
-                        setState(() {
-                          _subAreaOptions.clear();
-                          _selectedSubAreas.clear();
-                          _allSelected = false;
-                        });
-                      }
-
+            if (_selectedMainArea != null && _subAreaOptions.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('하위 지역 필터'),
+                  TextButton(
+                    onPressed: () {
                       setState(() {
-                        _isRegionSearched = true;
-                        _regionMainTitle = mainTitle;
-                        _isMainRegion = (inputNorm == mainNorm);
+                        _selectedMainArea = null;
+                        _subAreaOptions.clear();
+                        _selectedSubAreas.clear();
+                        _allSelected = true;
                       });
                     },
-                    child: const Text('지역검색'),
+                    child: const Text('초기화'),
                   ),
-                ),
-                const SizedBox(width: 8),
-                if (_isRegionSearched && !_isMainRegion)
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        FocusScope.of(context).unfocus();
-                        final (mainTitle, _) = await notifier
-                            .fetchAllBySubArea(regionController.text);
-                        setState(() {
-                          _regionMainTitle = mainTitle;
-                        });
-                      },
-                      child: Text(
-                        _regionMainTitle != null
-                            ? '${_regionMainTitle!} 전체'
-                            : '전체',
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            if (_isMainRegion && _subAreaOptions.isNotEmpty) ...[
-              const SizedBox(height: 12),
+                ],
+              ),
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
@@ -214,6 +173,20 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                 child: const Text('필터 적용'),
               ),
             ],
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "선택된 날짜: ${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
+                  style: const TextStyle(fontSize: 14),
+                ),
+                TextButton(
+                  onPressed: _selectDate,
+                  child: const Text("날짜 선택"),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             Text('${state.ships.length}척의 예약가능한 선박이 검색됨',
                 style: const TextStyle(fontSize: 14)),

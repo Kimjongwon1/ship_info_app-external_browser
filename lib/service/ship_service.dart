@@ -235,4 +235,24 @@ class ShipService {
       return [];
     }
   }
+
+  static Future<List<String>> getAllMainAreaTitles() async {
+    try {
+      final areaRes = await http.get(
+        Uri.parse('https://api.sunsang24.com/ship/filter_area/general'),
+      );
+
+      final rawAreas = jsonDecode(areaRes.body)['area'] as List<dynamic>? ?? [];
+
+      final titles = rawAreas
+          .map((region) => region['title']?.toString())
+          .whereType<String>() // ✅ 타입 안전하게 필터링
+          .toList();
+
+      return titles;
+    } catch (e) {
+      debugPrint('❌ 메인 지역 목록 로딩 실패: $e');
+      return [];
+    }
+  }
 }
