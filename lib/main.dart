@@ -187,6 +187,24 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                 ],
               ),
             ],
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "선택된 날짜: ${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
+                    style: const TextStyle(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _selectDate,
+                  child: const Text(
+                    "날짜 선택",
+                    style: TextStyle(color: Colors.black),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
