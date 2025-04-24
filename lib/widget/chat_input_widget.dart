@@ -1,8 +1,6 @@
-// lib/widget/chat_input_widget.dart
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+
+import '../service/chat_stomp_service.dart'; // 여기를 import
 
 class ChatInputWidget extends StatefulWidget {
   const ChatInputWidget({super.key});
@@ -14,20 +12,12 @@ class ChatInputWidget extends StatefulWidget {
 class _ChatInputWidgetState extends State<ChatInputWidget> {
   final TextEditingController _controller = TextEditingController();
 
-  Future<void> sendMessage() async {
-    final url =
-        Uri.parse('http://10.0.2.2:8080/api/chat/send'); // ❗ PC에서 실제 IP로 바꿔야 함
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "sender": "FlutterUser",
-        "message": _controller.text,
-      }),
-    );
-
-    print("응답: ${response.body}");
-    _controller.clear();
+  void _sendStompMessage() {
+    final text = _controller.text.trim();
+    if (text.isNotEmpty) {
+      sendMessage("FlutterUser", text); // STOMP 방식 전송
+      _controller.clear();
+    }
   }
 
   @override
@@ -43,8 +33,8 @@ class _ChatInputWidgetState extends State<ChatInputWidget> {
         ),
         const SizedBox(height: 8),
         ElevatedButton(
-          onPressed: sendMessage,
-          child: const Text("Kafka로 전송"),
+          onPressed: _sendStompMessage,
+          child: const Text("전송"),
         ),
       ],
     );

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../components/main_area_dropdown.dart';
-import '../components/sub_area_filter_chips.dart';
 import '../components/date_selector.dart';
 import '../components/filter_action_buttons.dart';
+import '../components/main_area_dropdown.dart';
 import '../components/ship_list_section.dart';
-import '../components/chat_input_widget.dart';
+import '../components/sub_area_filter_chips.dart';
 import '../model/ship.dart';
 import '../provider/ship_provider.dart';
 
@@ -44,7 +43,8 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
     final subAreas = await notifier.getSubAreasForMain(mainArea);
     setState(() {
       _selectedMainArea = mainArea;
-      _subAreaOptions = subAreas.where((e) => e.isNotEmpty && e != '전체').toList();
+      _subAreaOptions =
+          subAreas.where((e) => e.isNotEmpty && e != '전체').toList();
       _selectedSubAreas = _subAreaOptions.toSet();
       _allSelected = true;
     });
@@ -92,8 +92,118 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
     final notifier = ref.read(shipListProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('출조 정보 조회')),
-      body: Padding(
+      appBar: AppBar(
+        title: const Text('출조 서비스'),
+        automaticallyImplyLeading: false,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ShipSearchPage()),
+              ),
+              child: const Text('선박 검색하기'),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.pushNamed(context, '/chat'),
+              child: const Text('채팅하기'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ShipSearchPage extends ConsumerStatefulWidget {
+  const ShipSearchPage({super.key});
+
+  @override
+  ConsumerState<ShipSearchPage> createState() => _ShipSearchPageState();
+}
+
+class _ShipSearchPageState extends ConsumerState<ShipSearchPage> {
+  DateTime selectedDate = DateTime.now();
+  String? _selectedMainArea;
+  List<String> _mainAreaOptions = [];
+  List<String> _subAreaOptions = [];
+  Set<String> _selectedSubAreas = {};
+  bool _allSelected = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMainAreas();
+  }
+
+  Future<void> _loadMainAreas() async {
+    final notifier = ref.read(shipListProvider.notifier);
+    final areas = await notifier.getAllMainAreas();
+    setState(() {
+      _mainAreaOptions = areas;
+    });
+  }
+
+  Future<void> _loadSubAreas(String mainArea) async {
+    final notifier = ref.read(shipListProvider.notifier);
+    final subAreas = await notifier.getSubAreasForMain(mainArea);
+    setState(() {
+      _selectedMainArea = mainArea;
+      _subAreaOptions =
+          subAreas.where((e) => e.isNotEmpty && e != '전체').toList();
+      _selectedSubAreas = _subAreaOptions.toSet();
+      _allSelected = true;
+    });
+    notifier.reset();
+  }
+
+  void _toggleAllSubAreas(bool selectAll) {
+    setState(() {
+      if (selectAll) {
+        _selectedSubAreas = _subAreaOptions.toSet();
+      } else {
+        _selectedSubAreas.clear();
+      }
+      _allSelected = selectAll;
+    });
+  }
+
+  void _toggleSubArea(String area, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedSubAreas.add(area);
+      } else {
+        _selectedSubAreas.remove(area);
+      }
+      _allSelected = _selectedSubAreas.length == _subAreaOptions.length;
+    });
+  }
+
+  void _resetState() {
+    final notifier = ref.read(shipListProvider.notifier);
+    notifier.reset();
+    setState(() {
+      _selectedMainArea = null;
+      _mainAreaOptions.clear();
+      _subAreaOptions.clear();
+      _selectedSubAreas.clear();
+      _allSelected = true;
+    });
+    _loadMainAreas();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(shipListProvider);
+    final notifier = ref.read(shipListProvider.notifier);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('선박 검색하기')),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,7 +233,8 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
 
                   final allShips = <Ship>[];
                   for (final area in _selectedSubAreas) {
-                    final ships = await notifier.fetchOnlyDirectWithMain(area, _selectedMainArea!);
+                    final ships = await notifier.fetchOnlyDirectWithMain(
+                        area, _selectedMainArea!);
                     allShips.addAll(ships);
                   }
                   notifier.setShipList(allShips);
@@ -151,8 +262,6 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
               state: state,
               selectedDate: selectedDate,
             ),
-            const SizedBox(height: 12),
-            const ChatInputWidget(),
           ],
         ),
       ),
