@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../service/chat_stomp_service.dart'; // 여기를 import
+import '../service/chat_stomp_service.dart'; // STOMP 전송 함수 위치
 
 class ChatInputWidget extends StatefulWidget {
-  const ChatInputWidget({super.key});
+  final String roomId; // ✅ roomId 전달받음
+
+  const ChatInputWidget({super.key, required this.roomId});
 
   @override
   State<ChatInputWidget> createState() => _ChatInputWidgetState();
@@ -15,7 +17,7 @@ class _ChatInputWidgetState extends State<ChatInputWidget> {
   void _sendStompMessage() {
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
-      sendMessage("FlutterUser", text); // STOMP 방식 전송
+      sendMessage("FlutterUser", text, widget.roomId); // ✅ roomId 포함해서 전송
       _controller.clear();
     }
   }

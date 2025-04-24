@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../service/chat_api_service.dart'; // 🔥 히스토리 API
-import '../service/chat_stomp_service.dart'; // ✅ STOMP 방식으로 교체
+import '../service/chat_api_service.dart';
+import '../service/chat_stomp_service.dart';
 import 'chat_message_widget.dart';
 
 class ChatReceiverWidget extends StatefulWidget {
-  const ChatReceiverWidget({super.key});
+  final String roomId; // ✅ roomId 추가
+
+  const ChatReceiverWidget({super.key, required this.roomId});
 
   @override
   State<ChatReceiverWidget> createState() => _ChatReceiverWidgetState();
@@ -14,15 +16,14 @@ class ChatReceiverWidget extends StatefulWidget {
 class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
   final List<Map<String, dynamic>> messages = [];
   final String currentUser = 'FlutterUser';
-  final ScrollController _scrollController =
-      ScrollController(); // ✅ 스크롤 컨트롤러 추가
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadHistory();
 
-    connectStomp((data) {
+    connectStomp(widget.roomId, (data) {
       final timestamp = data['timestamp'] ?? DateTime.now().toIso8601String();
 
       setState(() {
@@ -34,7 +35,6 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
         _sortMessages();
       });
 
-      // ✅ 메시지 추가 후 가장 아래로 점프
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
@@ -44,13 +44,12 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
   }
 
   Future<void> _loadHistory() async {
-    final history = await ChatApiService.fetchChatHistory();
+    final history = await ChatApiService.fetchChatHistoryByRoom(widget.roomId);
     setState(() {
       messages.addAll(history);
       _sortMessages();
     });
 
-    // ✅ 히스토리 불러온 뒤에도 아래로 이동
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
@@ -59,21 +58,21 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
   }
 
   void _sortMessages() {
-    messages.sort((a, b) => DateTime.parse(a['timestamp'])
-        .compareTo(DateTime.parse(b['timestamp'])));
+    messages.sort((a, b) =>
+        DateTime.parse(a['timestamp']).compareTo(DateTime.parse(b['timestamp'])));
   }
 
   @override
   void dispose() {
     stompClient.deactivate();
-    _scrollController.dispose(); // ✅ 리소스 정리
+    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      controller: _scrollController, // ✅ 연결
+      controller: _scrollController,
       itemCount: messages.length,
       itemBuilder: (_, index) {
         final msg = messages[index];

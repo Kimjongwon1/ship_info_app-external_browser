@@ -109,7 +109,7 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/chat'),
+              onPressed: () => Navigator.pushNamed(context, '/chat-rooms'),
               child: const Text('채팅하기'),
             ),
           ],
