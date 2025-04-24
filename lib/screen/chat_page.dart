@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ship_info_app/widget/chat_header.dart';
 
 import '../widget/chat_input_widget.dart';
 import '../widget/chat_receiver_widget.dart';
@@ -16,6 +17,7 @@ class ChatPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            ChatHeader(roomId: roomId),
             Expanded(child: ChatReceiverWidget(roomId: roomId)), // ✅ 전달
             const SizedBox(height: 16),
             ChatInputWidget(roomId: roomId), // ✅ 전달

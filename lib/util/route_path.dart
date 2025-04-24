@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ship_info_app/screen/chat_room_create_page.dart';
 import 'package:ship_info_app/screen/chat_room_list_page.dart';
 
 import '../screen/chat_page.dart';
@@ -29,6 +30,8 @@ class RoutePath {
         }
       case '/chat-rooms':
         return MaterialPageRoute(builder: (_) => const ChatRoomListPage());
+      case '/create-room':
+        return MaterialPageRoute(builder: (_) => const ChatRoomCreatePage());
 
       default:
         return MaterialPageRoute(

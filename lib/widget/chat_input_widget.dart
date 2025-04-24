@@ -32,6 +32,7 @@ class _ChatInputWidgetState extends State<ChatInputWidget> {
             hintText: "채팅 메시지 입력",
             border: OutlineInputBorder(),
           ),
+          onSubmitted: (_) => _sendStompMessage(),
         ),
         const SizedBox(height: 8),
         ElevatedButton(
