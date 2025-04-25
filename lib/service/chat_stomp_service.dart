@@ -13,7 +13,7 @@ void connectStomp(String roomId, Function(Map<String, dynamic>) onMessage,
     {VoidCallback? onConnected}) {
   stompClient = StompClient(
     config: StompConfig.SockJS(
-      url: 'http://192.168.219.41:8080/ws-chat',
+      url: 'http://192.168.219.150:8080/ws-chat',
       onConnect: (StompFrame frame) {
         isStompConnected = true;
         stompClient.subscribe(

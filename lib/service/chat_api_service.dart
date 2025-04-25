@@ -5,9 +5,9 @@ import 'package:http/http.dart' as http;
 import '../model/chat_room.dart';
 
 class ChatApiService {
-  static const String baseUrl = 'http://192.168.219.41:8080/api/chat';
+  static const String baseUrl = 'http://192.168.219.150:8080/api/chat';
 
-  static const String roomBaseUrl = 'http://192.168.219.41:8080/api/room';
+  static const String roomBaseUrl = 'http://192.168.219.150:8080/api/room';
 
   static Future<List<ChatRoom>> fetchRoomList() async {
     final response = await http.get(Uri.parse('$roomBaseUrl/list'));

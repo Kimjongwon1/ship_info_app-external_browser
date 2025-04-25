@@ -25,11 +25,6 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
   @override
   void initState() {
     super.initState();
-    connectStompForRoomList((roomId, count) {
-      setState(() {
-        participantCache[roomId] = count;
-      });
-    });
     _fetchRooms();
   }
 
@@ -42,6 +37,12 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
         _applyFilter();
       });
       _fetchParticipantsForRooms(rooms);
+
+      connectStompForRoomList((roomId, count) {
+        setState(() {
+          participantCache[roomId] = count;
+        });
+      });
     } catch (e) {
       print("❌ 채팅방 목록 오류: $e");
     } finally {
@@ -107,7 +108,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'http://192.168.219.41:8080/ws-chat',
+        url: 'http://192.168.219.150:8080/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           // 🔥 각 방에 대한 참여자 수 구독
