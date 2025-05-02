@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../components/date_selector.dart';
 import '../components/filter_action_buttons.dart';
@@ -109,7 +110,18 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/chat-rooms'),
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('jwt');
+
+                if (token == null) {
+                  // 로그인 페이지로 이동
+                  Navigator.pushNamed(context, '/'); // 또는 LoginPage() 직접
+                } else {
+                  // 채팅방 리스트로 이동
+                  Navigator.pushNamed(context, '/chat-rooms');
+                }
+              },
               child: const Text('채팅하기'),
             ),
           ],

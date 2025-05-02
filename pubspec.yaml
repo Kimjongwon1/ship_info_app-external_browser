@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   fluttertoast: ^8.2.4  
+  shared_preferences: ^2.2.2
   http: ^0.13.6
   flutter_riverpod: ^2.4.0
   freezed_annotation: ^2.4.1

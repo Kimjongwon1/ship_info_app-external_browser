@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ship_info_app/screen/auth/login_page.dart';
 import 'package:ship_info_app/screen/chat_room_create_page.dart';
 import 'package:ship_info_app/screen/chat_room_list_page.dart';
 
@@ -11,6 +12,8 @@ class RoutePath {
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case '/':
+        return MaterialPageRoute(builder: (_) => const LoginPage()); 
       case shipList:
         return MaterialPageRoute(builder: (_) => const ShipListPage());
       case chat:

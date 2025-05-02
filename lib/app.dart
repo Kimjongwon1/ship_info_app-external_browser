@@ -7,9 +7,12 @@ import 'util/route_path.dart';
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>(); // ✅ 추가
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
+      navigatorKey: navigatorKey, 
       debugShowCheckedModeBanner: false,
       initialRoute: RoutePath.shipList,
       onGenerateRoute: RoutePath.onGenerateRoute,
