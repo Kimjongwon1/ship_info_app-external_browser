@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ship_info_app/model/chat_room.dart';
+import 'package:ship_info_app/widget/ToastInRoom.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
@@ -70,7 +71,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
 
   void _showCreateRoomDialog() {
     final TextEditingController nameController = TextEditingController();
-
+    final passwordController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -82,6 +83,12 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
               controller: nameController,
               decoration: const InputDecoration(labelText: "방 이름"),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: "비밀번호 (선택)"),
+            ),
           ],
         ),
         actions: [
@@ -92,8 +99,9 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
           ElevatedButton(
             onPressed: () async {
               final name = nameController.text.trim();
+              final password = passwordController.text.trim();
               if (name.isNotEmpty) {
-                await ChatApiService.createRoom(name);
+                await ChatApiService.createRoom(name, password);
                 Navigator.pop(context);
                 _fetchRooms(); // 방 생성 후 목록 새로고침
               }
@@ -191,26 +199,101 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
 
                       return Card(
                         child: ListTile(
-                          leading: const Icon(Icons.chat_bubble_outline,
-                              color: Colors.blue),
+                          leading: Icon(
+                            room.password != null && room.password!.isNotEmpty
+                                ? Icons.lock_outline
+                                : Icons.chat_bubble_outline,
+                            color: room.password != null &&
+                                    room.password!.isNotEmpty
+                                ? Colors.red
+                                : Colors.blue,
+                          ),
+
                           title: Text(room.name),
+                          onTap: () async {
+                            // print(
+                            //     "🧪 방 이름: ${room.name}, 비번: ${room.password}");
+                            final prefs = await SharedPreferences.getInstance();
+                            final role = prefs.getString('role');
+                            if (role == "ROLE_MASTER") {
+                              // 마스터는 비밀번호 없이 입장
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        ChatPage(roomId: room.id.toString())),
+                              );
+                              return;
+                            }
+                            if (room.password != null &&
+                                room.password!.isNotEmpty) {
+                              final controller = TextEditingController();
+                              final input = await showDialog<String>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text("비밀번호 입력"),
+                                  content: TextField(
+                                    controller: controller,
+                                    obscureText: true,
+                                    decoration:
+                                        const InputDecoration(hintText: "비밀번호"),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, null),
+                                        child: const Text("취소")),
+                                    ElevatedButton(
+                                        onPressed: () => Navigator.pop(
+                                            context, controller.text),
+                                        child: const Text("입장")),
+                                  ],
+                                ),
+                              );
+                              if (input == null) return;
+                              if (input != room.password) {
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: const Text("입장 실패"),
+                                    content: const Text("❌ 비밀번호가 틀렸습니다"),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text("확인"),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      ChatPage(roomId: room.id.toString())),
+                            );
+                          },
+
                           // subtitle: Text(countText),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.arrow_forward_ios,
-                                    size: 16),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ChatPage(roomId: room.id.toString()),
-                                    ),
-                                  );
-                                },
-                              ),
+                              // IconButton(
+                              //   icon: const Icon(Icons.arrow_forward_ios,
+                              //       size: 16),
+                              //   onPressed: () {
+                              //     Navigator.push(
+                              //       context,
+                              //       MaterialPageRoute(
+                              //         builder: (_) =>
+                              //             ChatPage(roomId: room.id.toString()),
+                              //       ),
+                              //     );
+                              //   },
+                              // ),
                               IconButton(
                                 icon:
                                     const Icon(Icons.delete, color: Colors.red),

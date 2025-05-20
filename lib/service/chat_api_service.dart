@@ -18,7 +18,7 @@ class ChatApiService {
 
   static Future<Map<String, String>> _authHeaders() async {
     final token = await _getToken();
-    print("🪪 SharedPreferences에 저장된 JWT: $token");
+    // print("🪪 SharedPreferences에 저장된 JWT: $token");
     return {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
@@ -29,8 +29,8 @@ class ChatApiService {
     final headers = await _authHeaders();
     final response =
         await http.get(Uri.parse('$roomBaseUrl/list'), headers: headers);
-    print("📦 요청 헤더: $headers");
-    print("🌐 상태코드: ${response.statusCode}");
+    // print("📦 요청 헤더: $headers");
+    // print("🌐 상태코드: ${response.statusCode}");
     print("📄 응답본문: ${response.body}");
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -85,14 +85,14 @@ class ChatApiService {
     }
   }
 
-  static Future<void> createRoom(String name) async {
+  static Future<void> createRoom(String name, String password) async {
     final headers = await _authHeaders();
     final url = Uri.parse('$roomBaseUrl/create');
 
     final response = await http.post(
       url,
       headers: headers,
-      body: utf8.encode(jsonEncode({"name": name})),
+      body: utf8.encode(jsonEncode({"name": name, "password": password})),
     );
 
     if (response.statusCode != 200) {

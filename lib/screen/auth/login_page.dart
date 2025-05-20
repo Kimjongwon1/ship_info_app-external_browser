@@ -35,24 +35,49 @@ class LoginPage extends ConsumerWidget {
             Button(
               text: '로그인',
               onPressed: () async {
-                  print("🔥 로그인 버튼 눌림");
-
+                // print("🔥 로그인 버튼 눌림");
                 final result = await ref.read(authProvider.notifier).login(
                       usernameController.text,
                       passwordController.text,
                     );
-                      print("✅ 로그인 result: $result");
-
+                // print("✅ 로그인 result: $result");
+                if (usernameController.text.isEmpty ||
+                    passwordController.text.isEmpty) {
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text("로그인 실패"),
+                      content: const Text("아이디 또는 비밀번호를 입력하세요"),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("확인"),
+                        ),
+                      ],
+                    ),
+                  );
+                  return;
+                }
                 if (result) {
-              Toast.show(context, '로그인 성공');
+                  Toast.show(context, '로그인 성공');
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(
-                        builder: (_) => const ChatRoomListPage()), // ✅ 여기로 이동
+                    MaterialPageRoute(builder: (_) => const ChatRoomListPage()),
                   );
                 } else {
-                 Toast.show(context, '로그인 실패');
-
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text("로그인 실패"),
+                      content: const Text("아이디 또는 비밀번호가 잘못되었습니다"),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("확인"),
+                        ),
+                      ],
+                    ),
+                  );
                 }
               },
             ),

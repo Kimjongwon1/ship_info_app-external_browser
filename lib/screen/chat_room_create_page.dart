@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../service/chat_api_service.dart';
 
 class ChatRoomCreatePage extends StatefulWidget {
@@ -10,9 +11,10 @@ class ChatRoomCreatePage extends StatefulWidget {
 
 class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
   final _nameController = TextEditingController();
-
+  final _passwordController = TextEditingController();
   Future<void> _createRoom() async {
     final name = _nameController.text.trim();
+    final password = _passwordController.text.trim();
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -22,7 +24,7 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
     }
 
     try {
-      await ChatApiService.createRoom(name); // ✅ name만 보냄
+      await ChatApiService.createRoom(name, password);
       Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -42,6 +44,12 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: "방 이름"),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: "비밀번호 (선택)"),
             ),
             const SizedBox(height: 20),
             ElevatedButton(

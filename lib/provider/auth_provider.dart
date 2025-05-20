@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,14 +18,20 @@ class AuthNotifier extends StateNotifier<bool> {
       body: jsonEncode({'username': username, 'password': password}),
     );
 
-    print("📡 응답코드: ${response.statusCode}");
-    print("📡 응답본문: ${response.body}");
+    // print("📡 응답코드: ${response.statusCode}");
+    // print("📡 응답본문: ${response.body}");
     if (response.statusCode == 200) {
-      final token = response.headers['authorization']?.replaceFirst('Bearer ', '');
-          print("🪪 JWT 토큰: $token");
+      final token =
+          response.headers['authorization']?.replaceFirst('Bearer ', '');
+      final jsonBody = jsonDecode(response.body);
+      final role = jsonBody['role'];
+
       if (token != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt', token);
+        if (role != null) {
+          await prefs.setString('role', role);
+        }
         state = true;
         return true;
       }
