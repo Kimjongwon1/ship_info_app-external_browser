@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ship_info_app/util/route_path.dart';
 
 import '../components/date_selector.dart';
 import '../components/filter_action_buttons.dart';
@@ -116,7 +117,7 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
 
                 if (token == null) {
                   // 로그인 페이지로 이동
-                  Navigator.pushNamed(context, '/'); // 또는 LoginPage() 직접
+                  Navigator.pushNamed(context, RoutePath.login); // 또는 LoginPage() 직접
                 } else {
                   // 채팅방 리스트로 이동
                   Navigator.pushNamed(context, '/chat-rooms');

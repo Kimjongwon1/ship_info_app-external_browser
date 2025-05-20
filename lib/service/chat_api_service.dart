@@ -2,12 +2,14 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ship_info_app/app.dart';
+import 'package:ship_info_app/util/route_path.dart';
 
 import '../model/chat_room.dart';
 
 class ChatApiService {
-  static const String baseUrl = 'http://192.168.219.150:8080/api/chat';
-  static const String roomBaseUrl = 'http://192.168.219.150:8080/api/room';
+  static const String baseUrl = 'http://192.168.219.43:8080/api/chat';
+  static const String roomBaseUrl = 'http://192.168.219.43:8080/api/room';
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -16,6 +18,7 @@ class ChatApiService {
 
   static Future<Map<String, String>> _authHeaders() async {
     final token = await _getToken();
+    print("🪪 SharedPreferences에 저장된 JWT: $token");
     return {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
@@ -26,11 +29,18 @@ class ChatApiService {
     final headers = await _authHeaders();
     final response =
         await http.get(Uri.parse('$roomBaseUrl/list'), headers: headers);
-
+    print("📦 요청 헤더: $headers");
+    print("🌐 상태코드: ${response.statusCode}");
+    print("📄 응답본문: ${response.body}");
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
       return data.map((e) => ChatRoom.fromJson(e)).toList();
-    } else if (response.statusCode == 401) {
+    } else if (response.statusCode == 401 || response.statusCode == 403) {
+      print("🚫 인증 실패 → 로그인으로 이동");
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('jwt');
+
+      MyApp.navigatorKey.currentState?.pushReplacementNamed(RoutePath.login);
       throw Exception('unauthorized');
     } else {
       throw Exception('채팅방 목록 조회 실패');
@@ -41,6 +51,7 @@ class ChatApiService {
     final headers = await _authHeaders();
     final response =
         await http.get(Uri.parse('$baseUrl/history'), headers: headers);
+
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
       return data.cast<Map<String, dynamic>>();

@@ -9,11 +9,12 @@ import '../screen/ship_list_page.dart';
 class RoutePath {
   static const String shipList = '/ship-list';
   static const String chat = '/chat';
+  static const String login = '/login';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
-      case '/':
-        return MaterialPageRoute(builder: (_) => const LoginPage()); 
+      case login:
+        return MaterialPageRoute(builder: (_) => const LoginPage());
       case shipList:
         return MaterialPageRoute(builder: (_) => const ShipListPage());
       case chat:

@@ -12,7 +12,7 @@ class AuthNotifier extends StateNotifier<bool> {
 
   Future<bool> login(String username, String password) async {
     final response = await http.post(
-      Uri.parse('http://192.168.219.150:8080/api/login'),
+      Uri.parse('http://192.168.219.43:8080/api/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
     );

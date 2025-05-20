@@ -5,7 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'util/route_path.dart';
 
 class MyApp extends ConsumerWidget {
-  const MyApp({super.key});
+  final String initialRoute;
+  const MyApp({super.key, required this.initialRoute});
 
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>(); // ✅ 추가
 
@@ -14,7 +15,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp(
       navigatorKey: navigatorKey, 
       debugShowCheckedModeBanner: false,
-      initialRoute: RoutePath.shipList,
+      initialRoute: initialRoute,
       onGenerateRoute: RoutePath.onGenerateRoute,
     );
   }

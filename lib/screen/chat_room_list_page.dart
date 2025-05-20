@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ship_info_app/model/chat_room.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
@@ -108,7 +109,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'http://192.168.219.150:8080/ws-chat',
+        url: 'http://192.168.219.43:8080/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           // 🔥 각 방에 대한 참여자 수 구독
@@ -145,6 +146,16 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
             icon: const Icon(Icons.add),
             onPressed: _showCreateRoomDialog,
           ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: '로그아웃',
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('jwt'); // ✅ JWT 제거
+              Navigator.pushReplacementNamed(
+                  context, '/login'); // 또는 RoutePath.login
+            },
+          ),
         ],
       ),
       body: isLoading
@@ -169,7 +180,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: filteredRooms.length,
-                    separatorBuilder: (_, __) => const Divider(),
+                    separatorBuilder: (_, __) => const SizedBox(height: 18),
                     itemBuilder: (context, index) {
                       final room = filteredRooms[index];
                       final roomId = room.id.toString(); // int -> String 변환
@@ -182,8 +193,8 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
                         child: ListTile(
                           leading: const Icon(Icons.chat_bubble_outline,
                               color: Colors.blue),
-                          title: Text("방 이름: ${room.name}"),
-                          subtitle: Text(countText),
+                          title: Text(room.name),
+                          // subtitle: Text(countText),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

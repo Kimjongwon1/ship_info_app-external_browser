@@ -21,6 +21,7 @@ class Button extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+        elevation: 0, // ✅ 그림자 제거
       ),
       child: Text(text),
     );
