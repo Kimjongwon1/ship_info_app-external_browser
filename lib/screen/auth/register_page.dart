@@ -58,7 +58,7 @@ class RegisterPage extends ConsumerWidget {
                 print("📡 요청 보냄");
 
                 final response = await http.post(
-                  Uri.parse('http://192.168.219.43:8080/api/register'),
+                  Uri.parse('https://c095-118-131-64-204.ngrok-free.app/api/register'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({'username': id, 'password': pw}),
                 );

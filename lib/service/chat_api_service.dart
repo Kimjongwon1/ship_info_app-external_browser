@@ -8,8 +8,8 @@ import 'package:ship_info_app/util/route_path.dart';
 import '../model/chat_room.dart';
 
 class ChatApiService {
-  static const String baseUrl = 'http://192.168.219.43:8080/api/chat';
-  static const String roomBaseUrl = 'http://192.168.219.43:8080/api/room';
+  static const String baseUrl = 'https://c095-118-131-64-204.ngrok-free.app/api/chat';
+  static const String roomBaseUrl = 'https://c095-118-131-64-204.ngrok-free.app/api/room';
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();

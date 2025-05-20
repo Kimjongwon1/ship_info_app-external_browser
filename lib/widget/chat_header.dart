@@ -24,7 +24,7 @@ class _ChatHeaderState extends State<ChatHeader> {
 
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'http://192.168.219.43:8080/ws-chat',
+        url: 'https://c095-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           stompClient.subscribe(
             destination: '/sub/chat/participants/${widget.roomId}',

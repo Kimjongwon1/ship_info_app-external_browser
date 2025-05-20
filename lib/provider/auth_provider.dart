@@ -13,7 +13,7 @@ class AuthNotifier extends StateNotifier<bool> {
 
   Future<bool> login(String username, String password) async {
     final response = await http.post(
-      Uri.parse('http://192.168.219.43:8080/api/login'),
+      Uri.parse('https://c095-118-131-64-204.ngrok-free.app/api/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
     );
