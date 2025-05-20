@@ -58,16 +58,58 @@ class RegisterPage extends ConsumerWidget {
                 print("📡 요청 보냄");
 
                 final response = await http.post(
-                  Uri.parse('https://c095-118-131-64-204.ngrok-free.app/api/register'),
+                  Uri.parse(
+                      'https://c095-118-131-64-204.ngrok-free.app/api/register'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({'username': id, 'password': pw}),
                 );
+                if ([500, 502, 503, 504].contains(response.statusCode)) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("❌ 회원가입 실패"),
+                      content: const Text("서버와 연결할 수 없습니다."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("확인"),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
                 if (response.statusCode == 200) {
-                  Toast.show(context, '회원가입 성공! 로그인하세요');
-                  Navigator.pop(context); // 로그인 화면으로 돌아감
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("✅ 회원가입 성공"),
+                      content: const Text("로그인 화면으로 이동합니다."),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context); // 팝업 닫기
+                            Navigator.pop(context); // 로그인 화면으로 이동
+                          },
+                          child: const Text("확인"),
+                        ),
+                      ],
+                    ),
+                  );
                 } else {
-                  Toast.show(context, '회원가입 실패');
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("❌ 회원가입 실패"),
+                      content: const Text("중복된 아이디입니다."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("확인"),
+                        ),
+                      ],
+                    ),
+                  );
                 }
               },
             ),
