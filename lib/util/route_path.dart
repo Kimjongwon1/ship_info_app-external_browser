@@ -39,11 +39,7 @@ class RoutePath {
         return MaterialPageRoute(builder: (_) => const ChatRoomCreatePage());
 
       default:
-        return MaterialPageRoute(
-          builder: (_) => const Scaffold(
-            body: Center(child: Text('404 - Page not found')),
-          ),
-        );
+        return MaterialPageRoute(builder: (_) => const ShipListPage());
     }
   }
 }

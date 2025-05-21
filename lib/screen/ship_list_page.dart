@@ -94,11 +94,11 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
     final notifier = ref.read(shipListProvider.notifier);
 
     return PopScope(
-      canPop: false, // ✅ 뒤로가기 막기
+      canPop: false, 
       child: Scaffold(
         appBar: AppBar(
           title: const Text('출조 서비스'),
-          automaticallyImplyLeading: false, // 뒤로가기 버튼 제거
+          automaticallyImplyLeading: false, 
         ),
         body: Center(
           child: Column(
