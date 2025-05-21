@@ -8,12 +8,13 @@ class MyApp extends ConsumerWidget {
   final String initialRoute;
   const MyApp({super.key, required this.initialRoute});
 
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>(); // ✅ 추가
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      navigatorKey: navigatorKey, 
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       initialRoute: initialRoute,
       onGenerateRoute: RoutePath.onGenerateRoute,

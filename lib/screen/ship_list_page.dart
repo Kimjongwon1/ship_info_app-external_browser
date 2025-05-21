@@ -93,39 +93,40 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
     final state = ref.watch(shipListProvider);
     final notifier = ref.read(shipListProvider.notifier);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('출조 서비스'),
-        automaticallyImplyLeading: false,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ShipSearchPage()),
+    return PopScope(
+      canPop: false, // ✅ 뒤로가기 막기
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('출조 서비스'),
+          automaticallyImplyLeading: false, // 뒤로가기 버튼 제거
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ShipSearchPage()),
+                ),
+                child: const Text('선박 검색하기'),
               ),
-              child: const Text('선박 검색하기'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                final token = prefs.getString('jwt');
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  final token = prefs.getString('jwt');
 
-                if (token == null) {
-                  // 로그인 페이지로 이동
-                  Navigator.pushNamed(context, RoutePath.login); // 또는 LoginPage() 직접
-                } else {
-                  // 채팅방 리스트로 이동
-                  Navigator.pushNamed(context, '/chat-rooms');
-                }
-              },
-              child: const Text('채팅하기'),
-            ),
-          ],
+                  if (token == null) {
+                    Navigator.pushNamed(context, RoutePath.login);
+                  } else {
+                    Navigator.pushNamed(context, '/chat-rooms');
+                  }
+                },
+                child: const Text('채팅하기'),
+              ),
+            ],
+          ),
         ),
       ),
     );
