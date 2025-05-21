@@ -1,6 +1,6 @@
 {
-    "name": "ship_info_app",
-    "short_name": "ship_info_app",
+    "name": "CHAT_SHIRE ",
+    "short_name": "CHAT_SHIRE",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ship_info_app/screen/chat_room_list_page.dart';
+import 'package:CHAT_SHIRE/screen/chat_room_list_page.dart';
 
 import '../../provider/auth_provider.dart';
 import '../../widget/button.dart';

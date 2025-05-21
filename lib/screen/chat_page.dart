@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ship_info_app/util/route_path.dart'; // 로그인 경로로 이동할 때 필요
-import 'package:ship_info_app/widget/chat_header.dart';
+import 'package:CHAT_SHIRE/util/route_path.dart'; // 로그인 경로로 이동할 때 필요
+import 'package:CHAT_SHIRE/widget/chat_header.dart';
 
 import '../widget/chat_input_widget.dart';
 import '../widget/chat_receiver_widget.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:ship_info_app/screen/auth/login_page.dart';
-import 'package:ship_info_app/screen/chat_room_create_page.dart';
-import 'package:ship_info_app/screen/chat_room_list_page.dart';
+import 'package:CHAT_SHIRE/screen/auth/login_page.dart';
+import 'package:CHAT_SHIRE/screen/chat_room_create_page.dart';
+import 'package:CHAT_SHIRE/screen/chat_room_list_page.dart';
 
 import '../screen/chat_page.dart';
 import '../screen/ship_list_page.dart';

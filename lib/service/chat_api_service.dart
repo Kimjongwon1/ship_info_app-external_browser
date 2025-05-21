@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ship_info_app/app.dart';
-import 'package:ship_info_app/util/route_path.dart';
+import 'package:CHAT_SHIRE/app.dart';
+import 'package:CHAT_SHIRE/util/route_path.dart';
 
 import '../model/chat_room.dart';
 
