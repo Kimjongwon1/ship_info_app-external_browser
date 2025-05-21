@@ -32,6 +32,16 @@ class ChatMessageWidget extends StatelessWidget {
           crossAxisAlignment:
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            if (!isMe) // 내 메시지에는 생략
+              Text(
+                sender,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
+              ),
+            if (!isMe) const SizedBox(height: 4),
             Text(
               message,
               style: TextStyle(color: isMe ? Colors.white : Colors.black),

@@ -25,10 +25,13 @@ class AuthNotifier extends StateNotifier<bool> {
           response.headers['authorization']?.replaceFirst('Bearer ', '');
       final jsonBody = jsonDecode(response.body);
       final role = jsonBody['role'];
+      final username = jsonBody['username'];
 
       if (token != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt', token);
+        await prefs.setString('username', username);
+        print('✅ 저장된 유저명: $username');
         if (role != null) {
           await prefs.setString('role', role);
         }

@@ -1,9 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:stomp_dart_client/stomp.dart';
-import 'package:stomp_dart_client/stomp_config.dart';
-import 'package:stomp_dart_client/stomp_frame.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../service/chat_api_service.dart';
+import '../service/chat_stomp_service.dart';
 
 class ChatHeader extends StatefulWidget {
   final String roomId;
@@ -16,46 +15,77 @@ class ChatHeader extends StatefulWidget {
 
 class _ChatHeaderState extends State<ChatHeader> {
   int participantCount = 0;
-  late StompClient stompClient;
+  String currentUser = '';
+  bool subscribed = false;
 
   @override
   void initState() {
     super.initState();
-
-    stompClient = StompClient(
-      config: StompConfig.SockJS(
-        url: 'https://c095-118-131-64-204.ngrok-free.app/ws-chat',
-        onConnect: (StompFrame frame) {
-          stompClient.subscribe(
-            destination: '/sub/chat/participants/${widget.roomId}',
-            callback: (frame) {
-              final count = int.tryParse(frame.body ?? '');
-              if (count != null) {
-                setState(() => participantCount = count);
-              }
-            },
-          );
-
-          // 처음 입장 시 참여 이벤트 전송
-          stompClient.send(
-            destination: '/pub/chat/join',
-            body: jsonEncode({
-              'roomId': widget.roomId,
-              'username': 'FlutterUser',
-            }),
-          );
-        },
-        onWebSocketError: (e) => print('WebSocket error: $e'),
-      ),
-    );
-
-    stompClient.activate();
+    _init();
   }
 
   @override
-  void dispose() {
-    stompClient.deactivate();
-    super.dispose();
+  void didUpdateWidget(covariant ChatHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.roomId != oldWidget.roomId) {
+      subscribed = false;
+      _init(); // 다시 초기화
+    }
+  }
+
+  Future<void> _init() async {
+    final prefs = await SharedPreferences.getInstance();
+    currentUser = prefs.getString('username') ?? 'UnknownUser';
+
+    await _fetchInitialCount();
+    await _waitAndSubscribe();
+  }
+
+  Future<void> _fetchInitialCount() async {
+    try {
+      final count =
+          await ChatApiService.fetchParticipantCountDirect(widget.roomId);
+      if (mounted) {
+        setState(() => participantCount = count);
+        debugPrint("🔢 초기 참여자 수: $count");
+      }
+    } catch (e) {
+      debugPrint("❌ 초기 참여자 수 가져오기 실패: $e");
+    }
+  }
+
+  Future<void> _waitAndSubscribe() async {
+    int retries = 20;
+    while (!stompClient.connected && retries-- > 0) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    if (!stompClient.connected) {
+      debugPrint("❌ STOMP 연결 실패 → 참여자 수 구독 못함");
+      return;
+    }
+
+    debugPrint("📡 STOMP 연결됨 → 참여자 수 구독 시작");
+
+    // ✅ 브로드캐스트용 실시간 구독
+    subscribeParticipantCount(widget.roomId, (count) {
+      if (mounted) {
+        setState(() => participantCount = count);
+      }
+    });
+
+    // ✅ 이 시점에서 딜레이 후 직접 값 조회
+    await Future.delayed(const Duration(milliseconds: 300)); // 약간 대기
+    try {
+      final count =
+          await ChatApiService.fetchParticipantCountDirect(widget.roomId);
+      if (mounted) {
+        setState(() => participantCount = count);
+        debugPrint("🔢 STOMP 연결 이후 초기 참여자 수: $count");
+      }
+    } catch (e) {
+      debugPrint("❌ 참여자 수 조회 실패: $e");
+    }
   }
 
   @override

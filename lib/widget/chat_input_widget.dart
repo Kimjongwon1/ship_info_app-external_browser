@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../service/chat_stomp_service.dart'; // STOMP 전송 함수 위치
 
@@ -14,10 +15,12 @@ class ChatInputWidget extends StatefulWidget {
 class _ChatInputWidgetState extends State<ChatInputWidget> {
   final TextEditingController _controller = TextEditingController();
 
-  void _sendStompMessage() {
+  Future<void> _sendStompMessage() async {
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
-      sendMessage("FlutterUser", text, widget.roomId); // ✅ roomId 포함해서 전송
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('username') ?? 'Unknown';
+      sendMessage(username, text, widget.roomId);
       _controller.clear();
     }
   }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../service/chat_api_service.dart';
 import '../service/chat_stomp_service.dart';
@@ -17,14 +18,21 @@ class ChatReceiverWidget extends StatefulWidget {
 
 class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
   final List<Map<String, dynamic>> messages = [];
-  final String currentUser = 'FlutterUser';
+  String currentUser = '';
   final ScrollController _scrollController = ScrollController();
   bool stompReady = false;
 
   @override
   void initState() {
     super.initState();
+    _initUserAndConnect();
     _loadHistory();
+  }
+
+  Future<void> _initUserAndConnect() async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('username') ?? 'UnknownUser';
+    currentUser = username;
 
     connectStomp(
       widget.roomId,
@@ -48,11 +56,23 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
         });
       },
       onConnected: () {
-        // STOMP 연결 후 처리
         setState(() => stompReady = true);
-        sendJoinEvent(widget.roomId, currentUser);
+        _sendJoinEvent(); // ✅ 연결 후 join 보냄
       },
     );
+  }
+
+  void _sendJoinEvent() {
+    if (stompClient.connected) {
+      stompClient.send(
+        destination: '/pub/chat/join',
+        body: jsonEncode({
+          'roomId': widget.roomId,
+          'username': currentUser,
+        }),
+      );
+      debugPrint("📥 join sent: $currentUser → ${widget.roomId}");
+    }
   }
 
   Future<void> _loadHistory() async {
@@ -76,6 +96,17 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
 
   @override
   void dispose() {
+    if (stompClient.connected) {
+      stompClient.send(
+        destination: '/pub/chat/leave',
+        body: jsonEncode({
+          'roomId': widget.roomId,
+          'username': currentUser,
+        }),
+      );
+      debugPrint("📤 leave sent: $currentUser → ${widget.roomId}");
+    }
+
     stompClient.deactivate();
     _scrollController.dispose();
     super.dispose();
@@ -101,16 +132,6 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
           isMe: isMe,
         );
       },
-    );
-  }
-
-  void sendJoinEvent(String roomId, String username) {
-    stompClient.send(
-      destination: '/pub/chat/join',
-      body: jsonEncode({
-        'roomId': roomId,
-        'username': username,
-      }),
     );
   }
 }

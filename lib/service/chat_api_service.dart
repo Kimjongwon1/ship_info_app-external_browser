@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ship_info_app/app.dart';
@@ -8,8 +9,10 @@ import 'package:ship_info_app/util/route_path.dart';
 import '../model/chat_room.dart';
 
 class ChatApiService {
-  static const String baseUrl = 'https://c095-118-131-64-204.ngrok-free.app/api/chat';
-  static const String roomBaseUrl = 'https://c095-118-131-64-204.ngrok-free.app/api/room';
+  static const String baseUrl =
+      'https://c095-118-131-64-204.ngrok-free.app/api/chat';
+  static const String roomBaseUrl =
+      'https://c095-118-131-64-204.ngrok-free.app/api/room';
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -107,6 +110,22 @@ class ChatApiService {
 
     if (response.statusCode != 200) {
       throw Exception("삭제 실패: ${response.body}");
+    }
+  }
+
+  static Future<int> fetchParticipantCountDirect(String roomId) async {
+    final headers = await _authHeaders();
+    final url = Uri.parse(
+        'https://c095-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
+    final response = await http.get(url, headers: headers);
+
+    if (response.statusCode == 200) {
+      debugPrint("❌ 서버 응답코드: ${response.statusCode}, 응답본문: ${response.body}");
+      return int.parse(response.body);
+    } else {
+      debugPrint("❌ 서버 응답코드: ${response.statusCode}, 응답본문: ${response.body}");
+
+      throw Exception("Failed to fetch direct participant count");
     }
   }
 }
