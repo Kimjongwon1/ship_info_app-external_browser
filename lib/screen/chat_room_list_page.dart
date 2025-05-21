@@ -116,7 +116,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://c095-118-131-64-204.ngrok-free.app/ws-chat',
+        url: 'https://816e-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           // 🔥 각 방에 대한 참여자 수 구독
@@ -219,8 +219,10 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) =>
-                                        ChatPage(roomId: room.id.toString())),
+                                    builder: (_) => ChatPage(
+                                          roomId: room.id.toString(),
+                                          roomName: room.name,
+                                        )),
                               );
                               return;
                             }
@@ -271,8 +273,10 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) =>
-                                      ChatPage(roomId: room.id.toString())),
+                                  builder: (_) => ChatPage(
+                                        roomId: room.id.toString(),
+                                        roomName: room.name,
+                                      )),
                             );
                           },
 

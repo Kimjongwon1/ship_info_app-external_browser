@@ -10,9 +10,9 @@ import '../model/chat_room.dart';
 
 class ChatApiService {
   static const String baseUrl =
-      'https://c095-118-131-64-204.ngrok-free.app/api/chat';
+      'https://816e-118-131-64-204.ngrok-free.app/api/chat';
   static const String roomBaseUrl =
-      'https://c095-118-131-64-204.ngrok-free.app/api/room';
+      'https://816e-118-131-64-204.ngrok-free.app/api/room';
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -116,7 +116,7 @@ class ChatApiService {
   static Future<int> fetchParticipantCountDirect(String roomId) async {
     final headers = await _authHeaders();
     final url = Uri.parse(
-        'https://c095-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
+        'https://816e-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
     final response = await http.get(url, headers: headers);
 
     if (response.statusCode == 200) {
@@ -124,7 +124,6 @@ class ChatApiService {
       return int.parse(response.body);
     } else {
       debugPrint("❌ 서버 응답코드: ${response.statusCode}, 응답본문: ${response.body}");
-
       throw Exception("Failed to fetch direct participant count");
     }
   }

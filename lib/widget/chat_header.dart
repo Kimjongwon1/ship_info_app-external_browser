@@ -37,7 +37,7 @@ class _ChatHeaderState extends State<ChatHeader> {
     final prefs = await SharedPreferences.getInstance();
     currentUser = prefs.getString('username') ?? 'UnknownUser';
 
-    await _fetchInitialCount();
+    // await _fetchInitialCount();
     await _waitAndSubscribe();
   }
 
@@ -73,9 +73,7 @@ class _ChatHeaderState extends State<ChatHeader> {
         setState(() => participantCount = count);
       }
     });
-
-    // ✅ 이 시점에서 딜레이 후 직접 값 조회
-    await Future.delayed(const Duration(milliseconds: 300)); // 약간 대기
+    await Future.delayed(const Duration(milliseconds: 200));
     try {
       final count =
           await ChatApiService.fetchParticipantCountDirect(widget.roomId);

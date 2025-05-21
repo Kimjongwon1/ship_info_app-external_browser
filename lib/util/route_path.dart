@@ -22,7 +22,8 @@ class RoutePath {
         if (args is Map<String, dynamic> && args['roomId'] != null) {
           final roomId = args['roomId'] as String;
           return MaterialPageRoute(
-            builder: (_) => ChatPage(roomId: roomId),
+            builder: (_) =>
+                ChatPage(roomId: roomId, roomName: args['roomName'] ?? '채팅방'),
           );
         } else {
           // 방 번호 없이 접근한 경우 에러 처리

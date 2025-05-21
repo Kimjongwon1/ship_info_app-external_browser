@@ -8,23 +8,22 @@ import '../widget/chat_receiver_widget.dart';
 
 class ChatPage extends StatelessWidget {
   final String roomId;
-
-  const ChatPage({super.key, required this.roomId});
+  final String roomName;
+  const ChatPage({super.key, required this.roomId, required this.roomName});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('채팅하기'),
+        title: Text('$roomName'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: '로그아웃',
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('jwt'); // ✅ JWT 제거
-              Navigator.pushReplacementNamed(
-                  context, RoutePath.login); // ✅ 로그인으로 이동
+              await prefs.remove('jwt');
+              Navigator.pushReplacementNamed(context, RoutePath.login);
             },
           ),
         ],
