@@ -13,7 +13,7 @@ void main() async {
   runApp(
     ProviderScope(
       child: MyApp(
-        initialRoute: token == null ? RoutePath.login : RoutePath.shipList,
+        initialRoute: RoutePath.shipList,
       ),
     ),
   );

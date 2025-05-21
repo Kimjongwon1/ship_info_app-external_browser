@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 import '../components/date_selector.dart';
 import '../components/filter_action_buttons.dart';
 import '../components/main_area_dropdown.dart';
@@ -26,11 +25,21 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
   List<String> _subAreaOptions = [];
   Set<String> _selectedSubAreas = {};
   bool _allSelected = true;
+  bool _isLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
     _loadMainAreas();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    setState(() {
+      _isLoggedIn = token != null;
+    });
   }
 
   Future<void> _loadMainAreas() async {
@@ -95,16 +104,35 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
     final notifier = ref.read(shipListProvider.notifier);
 
     return PopScope(
-      canPop: false, 
+      canPop: false,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('출조 서비스'),
-          automaticallyImplyLeading: false, 
-        ),
+        // appBar: AppBar(
+        //   title: const Padding(
+        //     padding: EdgeInsets.only(left: 10),
+        //     child: Text('CHAT SHIRE'),
+        //   ),
+        //   centerTitle: true,
+        //   automaticallyImplyLeading: false,
+        // ),
         body: Center(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
+              Image.asset(
+                'assets/icon.png',
+                width: 100,
+                height: 100,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '어서오세요!',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const Text(
+                '서비스를 시작하세요.',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () => Navigator.push(
                   context,
@@ -126,6 +154,26 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                 },
                 child: const Text('채팅하기'),
               ),
+              const SizedBox(height: 16),
+              _isLoggedIn
+                  ? ElevatedButton(
+                      onPressed: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.remove('jwt');
+                        setState(() => _isLoggedIn = false);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('로그아웃'),
+                    )
+                  : ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, RoutePath.login);
+                      },
+                      child: const Text('로그인'),
+                    ),
             ],
           ),
         ),

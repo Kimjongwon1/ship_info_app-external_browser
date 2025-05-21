@@ -1,6 +1,7 @@
+import 'package:CHAT_SHIRE/model/chat_room.dart';
+import 'package:CHAT_SHIRE/util/route_path.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:CHAT_SHIRE/model/chat_room.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
@@ -100,7 +101,12 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
               final name = nameController.text.trim();
               final password = passwordController.text.trim();
               if (name.isNotEmpty) {
-                await ChatApiService.createRoom(name, password);
+                await ChatApiService.createRoom(
+                  name,
+                  password,
+                  // createId,
+                  // isPrivate,
+                );
                 Navigator.pop(context);
                 _fetchRooms(); // 방 생성 후 목록 새로고침
               }
@@ -144,7 +150,13 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("💬 채팅방 목록"),
+        automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+              icon: const Icon(Icons.home),
+              onPressed: () {
+                Navigator.pushNamed(context, RoutePath.shipList);
+              }),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _fetchRooms,
@@ -152,16 +164,6 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: _showCreateRoomDialog,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: '로그아웃',
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('jwt'); // ✅ JWT 제거
-              Navigator.pushReplacementNamed(
-                  context, '/login'); // 또는 RoutePath.login
-            },
           ),
         ],
       ),

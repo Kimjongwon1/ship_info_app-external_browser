@@ -1,6 +1,6 @@
+import 'package:CHAT_SHIRE/screen/chat_room_list_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:CHAT_SHIRE/screen/chat_room_list_page.dart';
 
 import '../../provider/auth_provider.dart';
 import '../../widget/button.dart';
@@ -19,7 +19,21 @@ class LoginPage extends ConsumerWidget {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        appBar: AppBar(title: const Text('로그인'),automaticallyImplyLeading: false),
+        appBar: AppBar(
+          title: const Padding(
+            padding: EdgeInsets.only(left: 10),
+            child: Text('로그인'),
+          ),
+          centerTitle: true,
+          automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  Navigator.pop(context);
+                }),
+          ],
+        ),
         body: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
