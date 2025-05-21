@@ -37,7 +37,7 @@ class _ChatHeaderState extends State<ChatHeader> {
     final prefs = await SharedPreferences.getInstance();
     currentUser = prefs.getString('username') ?? 'UnknownUser';
 
-    // await _fetchInitialCount();
+    await _fetchInitialCount();
     await _waitAndSubscribe();
   }
 
@@ -55,9 +55,9 @@ class _ChatHeaderState extends State<ChatHeader> {
   }
 
   Future<void> _waitAndSubscribe() async {
-    int retries = 20;
+    int retries = 10;
     while (!stompClient.connected && retries-- > 0) {
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 20));
     }
 
     if (!stompClient.connected) {
@@ -73,7 +73,7 @@ class _ChatHeaderState extends State<ChatHeader> {
         setState(() => participantCount = count);
       }
     });
-    await Future.delayed(const Duration(milliseconds: 230));
+    // await Future.delayed(const Duration(milliseconds: 200));
     try {
       final count =
           await ChatApiService.fetchParticipantCountDirect(widget.roomId);

@@ -6,7 +6,7 @@ import '../../provider/auth_provider.dart';
 import '../../widget/button.dart';
 import '../../widget/input_field.dart';
 import '../../widget/toast.dart';
-import 'register_page.dart'; // ✅ 회원가입 페이지 import
+import 'register_page.dart';
 
 class LoginPage extends ConsumerWidget {
   const LoginPage({super.key});
@@ -16,82 +16,86 @@ class LoginPage extends ConsumerWidget {
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('로그인')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            InputField(
-              hint: '아이디',
-              controller: usernameController,
-            ),
-            InputField(
-              hint: '비밀번호',
-              controller: passwordController,
-              obscureText: true,
-            ),
-            const SizedBox(height: 16),
-            Button(
-              text: '로그인',
-              onPressed: () async {
-                // print("🔥 로그인 버튼 눌림");
-                final result = await ref.read(authProvider.notifier).login(
-                      usernameController.text,
-                      passwordController.text,
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('로그인'),automaticallyImplyLeading: false),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              InputField(
+                hint: '아이디',
+                controller: usernameController,
+              ),
+              InputField(
+                hint: '비밀번호',
+                controller: passwordController,
+                obscureText: true,
+              ),
+              const SizedBox(height: 16),
+              Button(
+                text: '로그인',
+                onPressed: () async {
+                  if (usernameController.text.isEmpty ||
+                      passwordController.text.isEmpty) {
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text("로그인 실패"),
+                        content: const Text("아이디 또는 비밀번호를 입력하세요"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("확인"),
+                          ),
+                        ],
+                      ),
                     );
-                // print("✅ 로그인 result: $result");
-                if (usernameController.text.isEmpty ||
-                    passwordController.text.isEmpty) {
-                  showDialog(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text("로그인 실패"),
-                      content: const Text("아이디 또는 비밀번호를 입력하세요"),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("확인"),
-                        ),
-                      ],
-                    ),
-                  );
-                  return;
-                }
-                if (result) {
-                  Toast.show(context, '로그인 성공');
-                  Navigator.pushReplacement(
+                    return;
+                  }
+
+                  final result = await ref.read(authProvider.notifier).login(
+                        usernameController.text,
+                        passwordController.text,
+                      );
+
+                  if (result) {
+                    Toast.show(context, '로그인 성공');
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ChatRoomListPage()),
+                    );
+                  } else {
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text("로그인 실패"),
+                        content: const Text("아이디 또는 비밀번호가 잘못되었습니다"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("확인"),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const ChatRoomListPage()),
+                    MaterialPageRoute(builder: (_) => const RegisterPage()),
                   );
-                } else {
-                  showDialog(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text("로그인 실패"),
-                      content: const Text("아이디 또는 비밀번호가 잘못되었습니다"),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("확인"),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterPage()),
-                );
-              },
-              child: const Text('회원가입'),
-            ),
-          ],
+                },
+                child: const Text('회원가입'),
+              ),
+            ],
+          ),
         ),
       ),
     );
