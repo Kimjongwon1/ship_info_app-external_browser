@@ -18,7 +18,7 @@ void connectStomp(String roomId, Function(Map<String, dynamic>) onMessage,
 
   stompClient = StompClient(
     config: StompConfig.SockJS(
-      url: 'https://816e-118-131-64-204.ngrok-free.app/ws-chat',
+      url: 'https://97a1-118-131-64-204.ngrok-free.app/ws-chat',
       onConnect: (StompFrame frame) {
         isStompConnected = true;
 

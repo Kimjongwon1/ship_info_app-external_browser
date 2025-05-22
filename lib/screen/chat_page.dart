@@ -1,7 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:CHAT_SHIRE/util/route_path.dart'; // 로그인 경로로 이동할 때 필요
 import 'package:CHAT_SHIRE/widget/chat_header.dart';
+import 'package:flutter/material.dart';
 
 import '../widget/chat_input_widget.dart';
 import '../widget/chat_receiver_widget.dart';
@@ -15,18 +13,18 @@ class ChatPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('$roomName'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: '로그아웃',
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('jwt');
-              Navigator.pushReplacementNamed(context, RoutePath.login);
-            },
-          ),
-        ],
+        title: Text(roomName),
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.logout),
+        //     tooltip: '로그아웃',
+        //     onPressed: () async {
+        //       final prefs = await SharedPreferences.getInstance();
+        //       await prefs.remove('jwt');
+        //       Navigator.pushReplacementNamed(context, RoutePath.login);
+        //     },
+        //   ),
+        // ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),

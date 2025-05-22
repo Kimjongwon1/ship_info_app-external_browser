@@ -23,11 +23,21 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
   Map<String, int> participantCache = {};
   bool isLoading = true;
   String searchKeyword = "";
-
+  String role = '';
+  String userId = '';
   @override
   void initState() {
     super.initState();
+    _loadUserData();
     _fetchRooms();
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      role = prefs.getString('role') ?? '';
+      userId = prefs.getString('userId') ?? '';
+    });
   }
 
   Future<void> _fetchRooms() async {
@@ -101,11 +111,12 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
               final name = nameController.text.trim();
               final password = passwordController.text.trim();
               if (name.isNotEmpty) {
+                final prefs = await SharedPreferences.getInstance();
+                final createId = prefs.getString('userId') ?? '';
                 await ChatApiService.createRoom(
                   name,
                   password,
-                  // createId,
-                  // isPrivate,
+                  createId,
                 );
                 Navigator.pop(context);
                 _fetchRooms(); // 방 생성 후 목록 새로고침
@@ -122,7 +133,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://816e-118-131-64-204.ngrok-free.app/ws-chat',
+        url: 'https://97a1-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           // 🔥 각 방에 대한 참여자 수 구독
@@ -147,77 +158,136 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("💬 채팅방 목록"),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-              icon: const Icon(Icons.home),
-              onPressed: () {
-                Navigator.pushNamed(context, RoutePath.shipList);
-              }),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchRooms,
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showCreateRoomDialog,
-          ),
-        ],
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: "방 이름 검색",
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (value) {
-                      searchKeyword = value;
-                      _applyFilter();
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: ListView.separated(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("💬 채팅방 목록"),
+          automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+                icon: const Icon(Icons.home),
+                onPressed: () {
+                  Navigator.pushNamed(context, RoutePath.shipList);
+                }),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _fetchRooms,
+            ),
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: _showCreateRoomDialog,
+            ),
+          ],
+        ),
+        body: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  Padding(
                     padding: const EdgeInsets.all(16),
-                    itemCount: filteredRooms.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 18),
-                    itemBuilder: (context, index) {
-                      final room = filteredRooms[index];
-                      final roomId = room.id.toString(); // int -> String 변환
-                      final roomName = room.name;
-                      final count = participantCache[roomId];
-                      final countText =
-                          (count != null) ? "👥 $count명 참여중" : "참여자 수 로딩 중...";
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        hintText: "방 이름 검색",
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
+                        searchKeyword = value;
+                        _applyFilter();
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filteredRooms.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 18),
+                      itemBuilder: (context, index) {
+                        final room = filteredRooms[index];
+                        final roomId = room.id.toString(); // int -> String 변환
+                        final roomName = room.name;
+                        final count = participantCache[roomId];
+                        final countText = (count != null)
+                            ? "👥 $count명 참여중"
+                            : "참여자 수 로딩 중...";
+                        // 🔍 디버깅용 로그 추가
 
-                      return Card(
-                        child: ListTile(
-                          leading: Icon(
-                            room.password != null && room.password!.isNotEmpty
-                                ? Icons.lock_outline
-                                : Icons.chat_bubble_outline,
-                            color: room.password != null &&
-                                    room.password!.isNotEmpty
-                                ? Colors.red
-                                : Colors.blue,
-                          ),
+                        return Card(
+                          child: ListTile(
+                            leading: Icon(
+                              room.password != null && room.password!.isNotEmpty
+                                  ? Icons.lock_outline
+                                  : Icons.chat_bubble_outline,
+                              color: room.password != null &&
+                                      room.password!.isNotEmpty
+                                  ? Colors.red
+                                  : Colors.blue,
+                            ),
 
-                          title: Text(room.name),
-                          onTap: () async {
-                            // print(
-                            //     "🧪 방 이름: ${room.name}, 비번: ${room.password}");
-                            final prefs = await SharedPreferences.getInstance();
-                            final role = prefs.getString('role');
-                            if (role == "ROLE_MASTER") {
-                              // 마스터는 비밀번호 없이 입장
+                            title: Text(room.name),
+                            onTap: () async {
+                              // print(
+                              //     "🧪 방 이름: ${room.name}, 비번: ${room.password}");
+
+                              if (role == "ROLE_MASTER" ||
+                                  room.createId == userId) {
+                                // 마스터는 비밀번호 없이 입장
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => ChatPage(
+                                            roomId: room.id.toString(),
+                                            roomName: room.name,
+                                          )),
+                                );
+                                return;
+                              }
+                              if (room.password != null &&
+                                  room.password!.isNotEmpty) {
+                                final controller = TextEditingController();
+                                final input = await showDialog<String>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text("비밀번호 입력"),
+                                    content: TextField(
+                                      controller: controller,
+                                      obscureText: true,
+                                      decoration: const InputDecoration(
+                                          hintText: "비밀번호"),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, null),
+                                          child: const Text("취소")),
+                                      ElevatedButton(
+                                          onPressed: () => Navigator.pop(
+                                              context, controller.text),
+                                          child: const Text("입장")),
+                                    ],
+                                  ),
+                                );
+                                if (input == null) return;
+                                if (input != room.password) {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text("입장 실패"),
+                                      content: const Text("❌ 비밀번호가 틀렸습니다"),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text("확인"),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  return;
+                                }
+                              }
+
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -226,116 +296,66 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
                                           roomName: room.name,
                                         )),
                               );
-                              return;
-                            }
-                            if (room.password != null &&
-                                room.password!.isNotEmpty) {
-                              final controller = TextEditingController();
-                              final input = await showDialog<String>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text("비밀번호 입력"),
-                                  content: TextField(
-                                    controller: controller,
-                                    obscureText: true,
-                                    decoration:
-                                        const InputDecoration(hintText: "비밀번호"),
+                            },
+
+                            // subtitle: Text(countText),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // IconButton(
+                                //   icon: const Icon(Icons.arrow_forward_ios,
+                                //       size: 16),
+                                //   onPressed: () {
+                                //     Navigator.push(
+                                //       context,
+                                //       MaterialPageRoute(
+                                //         builder: (_) =>
+                                //             ChatPage(roomId: room.id.toString()),
+                                //       ),
+                                //     );
+                                //   },
+                                // ),
+                                if (room.createId == userId ||
+                                    role == "ROLE_MASTER")
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () async {
+                                      final confirm = await showDialog(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: const Text("삭제 확인"),
+                                          content: const Text("정말 삭제하시겠습니까?"),
+                                          actions: [
+                                            TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx, false),
+                                                child: const Text("취소")),
+                                            TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx, true),
+                                                child: const Text("삭제")),
+                                          ],
+                                        ),
+                                      );
+
+                                      if (confirm == true) {
+                                        await ChatApiService.deleteRoom(
+                                            room.id);
+                                        _fetchRooms(); // 새로고침
+                                      }
+                                    },
                                   ),
-                                  actions: [
-                                    TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, null),
-                                        child: const Text("취소")),
-                                    ElevatedButton(
-                                        onPressed: () => Navigator.pop(
-                                            context, controller.text),
-                                        child: const Text("입장")),
-                                  ],
-                                ),
-                              );
-                              if (input == null) return;
-                              if (input != room.password) {
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text("입장 실패"),
-                                    content: const Text("❌ 비밀번호가 틀렸습니다"),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text("확인"),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                return;
-                              }
-                            }
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => ChatPage(
-                                        roomId: room.id.toString(),
-                                        roomName: room.name,
-                                      )),
-                            );
-                          },
-
-                          // subtitle: Text(countText),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // IconButton(
-                              //   icon: const Icon(Icons.arrow_forward_ios,
-                              //       size: 16),
-                              //   onPressed: () {
-                              //     Navigator.push(
-                              //       context,
-                              //       MaterialPageRoute(
-                              //         builder: (_) =>
-                              //             ChatPage(roomId: room.id.toString()),
-                              //       ),
-                              //     );
-                              //   },
-                              // ),
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () async {
-                                  final confirm = await showDialog(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: const Text("삭제 확인"),
-                                      content: const Text("정말 삭제하시겠습니까?"),
-                                      actions: [
-                                        TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(ctx, false),
-                                            child: const Text("취소")),
-                                        TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(ctx, true),
-                                            child: const Text("삭제")),
-                                      ],
-                                    ),
-                                  );
-
-                                  if (confirm == true) {
-                                    await ChatApiService.deleteRoom(room.id);
-                                    _fetchRooms(); // 새로고침
-                                  }
-                                },
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 }

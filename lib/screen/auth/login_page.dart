@@ -73,7 +73,7 @@ class LoginPage extends ConsumerWidget {
                         usernameController.text,
                         passwordController.text,
                       );
-
+                  print('✅ 로그인 결과: $result');
                   if (result) {
                     Toast.show(context, '로그인 성공');
                     Navigator.pushReplacement(

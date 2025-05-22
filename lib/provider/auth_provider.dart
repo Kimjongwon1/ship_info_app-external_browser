@@ -13,7 +13,7 @@ class AuthNotifier extends StateNotifier<bool> {
 
   Future<bool> login(String username, String password) async {
     final response = await http.post(
-      Uri.parse('https://816e-118-131-64-204.ngrok-free.app/api/login'),
+      Uri.parse('https://97a1-118-131-64-204.ngrok-free.app/api/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
     );
@@ -26,12 +26,14 @@ class AuthNotifier extends StateNotifier<bool> {
       final jsonBody = jsonDecode(response.body);
       final role = jsonBody['role'];
       final username = jsonBody['username'];
+      final userId = jsonBody['id'];
 
       if (token != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt', token);
         await prefs.setString('username', username);
-        print('✅ 저장된 유저명: $username');
+        await prefs.setString('userId', userId.toString());
+        print('✅ 저장된 유저명: $userId');
         if (role != null) {
           await prefs.setString('role', role);
         }

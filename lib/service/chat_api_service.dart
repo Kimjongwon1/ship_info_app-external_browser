@@ -1,18 +1,18 @@
 import 'dart:convert';
 
+import 'package:CHAT_SHIRE/app.dart';
+import 'package:CHAT_SHIRE/util/route_path.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:CHAT_SHIRE/app.dart';
-import 'package:CHAT_SHIRE/util/route_path.dart';
 
 import '../model/chat_room.dart';
 
 class ChatApiService {
   static const String baseUrl =
-      'https://816e-118-131-64-204.ngrok-free.app/api/chat';
+      'https://97a1-118-131-64-204.ngrok-free.app/api/chat';
   static const String roomBaseUrl =
-      'https://816e-118-131-64-204.ngrok-free.app/api/room';
+      'https://97a1-118-131-64-204.ngrok-free.app/api/room';
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -88,14 +88,16 @@ class ChatApiService {
     }
   }
 
-  static Future<void> createRoom(String name, String password) async {
+  static Future<void> createRoom(
+      String name, String password, String createId) async {
     final headers = await _authHeaders();
     final url = Uri.parse('$roomBaseUrl/create');
-
+    print('🔍 방 생성 요청2 - createId: $createId');
     final response = await http.post(
       url,
       headers: headers,
-      body: utf8.encode(jsonEncode({"name": name, "password": password})),
+      body: utf8.encode(jsonEncode(
+          {"name": name, "password": password, "createId": createId})),
     );
 
     if (response.statusCode != 200) {
@@ -116,7 +118,7 @@ class ChatApiService {
   static Future<int> fetchParticipantCountDirect(String roomId) async {
     final headers = await _authHeaders();
     final url = Uri.parse(
-        'https://816e-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
+        'https://97a1-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
     final response = await http.get(url, headers: headers);
 
     if (response.statusCode == 200) {
