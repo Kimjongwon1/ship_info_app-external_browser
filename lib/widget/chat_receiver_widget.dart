@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -34,8 +32,8 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
     final username = prefs.getString('username') ?? 'UnknownUser';
     currentUser = username;
 
-    // 🔍 현재 사용자명 로그
-    print('🔍 현재 사용자: $currentUser');
+    // 🔍 현재 사용자명 확인 (정상 동작 확인용 - 나중에 제거 가능)
+    // print('🔍 현재 사용자: $currentUser');
 
     connectStomp(
       widget.roomId,
@@ -67,20 +65,9 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
 
   void _sendJoinEvent() {
     if (stompClient.connected) {
-      // 🔍 하드코딩으로 테스트
-      final testUsername = "한글"; // DB에 있는 username 직접 사용
-
-      print('🔍 전송할 username: $testUsername');
-      print('🔍 username UTF-8 바이트: ${utf8.encode(testUsername)}');
-
-      stompClient.send(
-        destination: '/pub/chat/join',
-        body: jsonEncode({
-          'roomId': widget.roomId,
-          'username': testUsername,
-        }),
-        headers: {'content-type': 'application/json; charset=utf-8'},
-      );
+      // ✅ SharedPreferences에서 가져온 currentUser 그대로 사용
+      sendJoinEvent(widget.roomId, currentUser);
+      debugPrint("📥 join sent: $currentUser → ${widget.roomId}");
     }
   }
 
@@ -106,9 +93,9 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
   @override
   void dispose() {
     if (stompClient.connected) {
-      // 🔧 수정된 sendLeaveEvent 함수 사용 (UTF-8 헤더 포함)
+      // ✅ SharedPreferences에서 가져온 currentUser 그대로 사용
       sendLeaveEvent(widget.roomId, currentUser);
-      debugPrint("📤 leave sent: $currentUser → ${widget.roomId}");
+      // debugPrint("📤 leave sent: $currentUser → ${widget.roomId}");
     }
 
     stompClient.deactivate();

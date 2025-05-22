@@ -36,7 +36,7 @@ void connectStomp(String roomId, Function(Map<String, dynamic>) onMessage,
       onWebSocketError: (dynamic error) => print('❌ WebSocket Error: $error'),
       onDisconnect: (frame) {
         isStompConnected = false;
-        print("🔌 STOMP disconnected");
+        // print("🔌 STOMP disconnected");
       },
     ),
   );
@@ -96,7 +96,7 @@ void sendJoinEvent(String roomId, String username) {
 /// ✅ 퇴장 이벤트 전송
 void sendLeaveEvent(String roomId, String username) {
   if (stompClient.connected) {
-    print('📤 LEAVE: $username → $roomId');
+    // print('📤 LEAVE: $username → $roomId');
     stompClient.send(
       destination: '/pub/chat/leave',
       body: jsonEncode({
