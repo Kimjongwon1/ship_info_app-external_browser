@@ -34,6 +34,9 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
     final username = prefs.getString('username') ?? 'UnknownUser';
     currentUser = username;
 
+    // 🔍 현재 사용자명 로그
+    print('🔍 현재 사용자: $currentUser');
+
     connectStomp(
       widget.roomId,
       (data) {
@@ -64,14 +67,20 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
 
   void _sendJoinEvent() {
     if (stompClient.connected) {
+      // 🔍 하드코딩으로 테스트
+      final testUsername = "한글"; // DB에 있는 username 직접 사용
+
+      print('🔍 전송할 username: $testUsername');
+      print('🔍 username UTF-8 바이트: ${utf8.encode(testUsername)}');
+
       stompClient.send(
         destination: '/pub/chat/join',
         body: jsonEncode({
           'roomId': widget.roomId,
-          'username': currentUser,
+          'username': testUsername,
         }),
+        headers: {'content-type': 'application/json; charset=utf-8'},
       );
-      debugPrint("📥 join sent: $currentUser → ${widget.roomId}");
     }
   }
 
@@ -97,13 +106,8 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
   @override
   void dispose() {
     if (stompClient.connected) {
-      stompClient.send(
-        destination: '/pub/chat/leave',
-        body: jsonEncode({
-          'roomId': widget.roomId,
-          'username': currentUser,
-        }),
-      );
+      // 🔧 수정된 sendLeaveEvent 함수 사용 (UTF-8 헤더 포함)
+      sendLeaveEvent(widget.roomId, currentUser);
       debugPrint("📤 leave sent: $currentUser → ${widget.roomId}");
     }
 

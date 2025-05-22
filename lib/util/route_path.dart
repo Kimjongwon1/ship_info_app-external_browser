@@ -1,3 +1,4 @@
+import 'package:CHAT_SHIRE/screen/chat_room_private_list.dart';
 import 'package:flutter/material.dart';
 import 'package:CHAT_SHIRE/screen/auth/login_page.dart';
 import 'package:CHAT_SHIRE/screen/chat_room_create_page.dart';
@@ -37,7 +38,8 @@ class RoutePath {
         return MaterialPageRoute(builder: (_) => const ChatRoomListPage());
       case '/create-room':
         return MaterialPageRoute(builder: (_) => const ChatRoomCreatePage());
-
+      case '/private-chat-rooms':
+       return MaterialPageRoute(builder: (_) => const ChatRoomPrivateListPage());
       default:
         return MaterialPageRoute(builder: (_) => const ShipListPage());
     }

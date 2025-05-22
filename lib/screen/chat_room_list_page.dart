@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:CHAT_SHIRE/model/chat_room.dart';
 import 'package:CHAT_SHIRE/util/route_path.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +36,10 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('username') ?? 'UnknownUser';
+  
+  print('🔍 SharedPreferences에서 가져온 username: $username');
+  print('🔍 UTF-8 바이트: ${utf8.encode(username)}');
     setState(() {
       role = prefs.getString('role') ?? '';
       userId = prefs.getString('userId') ?? '';
@@ -162,7 +168,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
       canPop: false,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text("💬 채팅방 목록"),
+          title: const Text("💬실시간 채팅방 목록"),
           automaticallyImplyLeading: false,
           actions: [
             IconButton(

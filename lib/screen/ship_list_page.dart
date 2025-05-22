@@ -152,8 +152,21 @@ class _ShipListPageState extends ConsumerState<ShipListPage> {
                     Navigator.pushNamed(context, '/chat-rooms');
                   }
                 },
-                child: const Text('채팅하기'),
+                child: const Text('실시간 채팅방'),
               ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    final token = prefs.getString('jwt');
+
+                    if (token == null) {
+                      Navigator.pushNamed(context, RoutePath.login);
+                    } else {
+                      Navigator.pushNamed(context, '/private-chat-rooms');
+                    }
+                  },
+                  child: const Text('개인 채팅')),
               const SizedBox(height: 16),
               _isLoggedIn
                   ? ElevatedButton(
