@@ -47,14 +47,18 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   Future<void> _fetchPrivateRooms() async {
     setState(() => isLoading = true);
     try {
-      // 모든 방을 가져온 후 비공개 방만 필터링
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId') ?? '';
+
       final rooms = await ChatApiService.fetchPrivateRoomList();
+      final visibleRooms = rooms
+          .where((room) => room.createId == userId || room.inviteId == userId)
+          .toList();
 
       setState(() {
-        allRooms = rooms;
+        allRooms = visibleRooms;
         _applyFilter();
       });
-      // _fetchParticipantsForRooms(rooms);
 
       connectStompForRoomList((roomId, count) {
         setState(() {
@@ -68,19 +72,16 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
     }
   }
 
-  // Future<void> _fetchParticipantsForRooms(List<ChatRoom> rooms) async {
-  //   for (var room in rooms) {
-  //     final roomId = room.id.toString();
-  //     final count = await ChatApiService.fetchParticipantCount(roomId);
-  //     setState(() {
-  //       participantCache[roomId] = count;
-  //     });
-  //   }
-  // }
+  void _applyFilter() {
+    setState(() {
+      filteredRooms =
+          allRooms.where((room) => room.name.contains(searchKeyword)).toList();
+    });
+  }
 
   void _showUserSelectDialog() async {
     try {
-      final users = await ChatApiService.fetchAllUsers(); // 전체 사용자 가져오기
+      final users = await ChatApiService.fetchAllUsers();
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -95,8 +96,8 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                 return ListTile(
                   title: Text(user.name),
                   onTap: () {
-                    Navigator.pop(context); // 팝업 닫기
-                    _showCreatePrivateRoomDialog(user); // ✅ 여기서 함수 호출
+                    Navigator.pop(context);
+                    _showCreatePrivateRoomDialog(user);
                   },
                 );
               },
@@ -110,13 +111,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
         const SnackBar(content: Text("유저 목록 불러오기 실패")),
       );
     }
-  }
-
-  void _applyFilter() {
-    setState(() {
-      filteredRooms =
-          allRooms.where((room) => room.name.contains(searchKeyword)).toList();
-    });
   }
 
   void _showCreatePrivateRoomDialog(User inviteUser) {
@@ -133,12 +127,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
             TextField(
               controller: nameController,
               decoration: const InputDecoration(labelText: "방 이름"),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: "비밀번호 (선택)"),
             ),
           ],
         ),
@@ -171,10 +159,13 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                     builder: (_) => ChatPage(
                       roomId: roomId.toString(),
                       roomName: name,
+                      isPrivate: true,
                     ),
                   ),
-                );
-                _fetchPrivateRooms(); // 새로고침
+                ).then((_) {
+                  // ✅ 채팅방에서 돌아온 후 목록 자동 새로고침
+                  _fetchPrivateRooms();
+                });
               } catch (e) {
                 print('🔍 방 생성 요청2 - createId: $createId');
                 print('❌ 방 생성 오류: $e');
@@ -290,10 +281,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                             itemBuilder: (context, index) {
                               final room = filteredRooms[index];
                               final roomId = room.id.toString();
-                              // final count = participantCache[roomId];
-                              // final countText = (count != null)
-                              //     ? "👥 $count명 참여중"
-                              //     : "참여자 수 로딩 중...";
 
                               return Card(
                                 elevation: 3,
@@ -308,95 +295,9 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600),
                                   ),
-                                  // subtitle: Text(countText),
                                   onTap: () async {
-                                    // 마스터이거나 방 생성자인 경우 비밀번호 없이 입장
-                                    if (role == "ROLE_MASTER" ||
-                                        room.createId == userId) {
-                                      print(
-                                          "✅ 입장 성공: roomId=${room.id}, roomName=${room.name}");
-
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => ChatPage(
-                                            roomId: room.id.toString(),
-                                            roomName: room.name,
-                                             isPrivate: true,
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    // 일반 사용자는 비밀번호 입력 필요
-                                    final controller = TextEditingController();
-                                    final input = await showDialog<String>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: Row(
-                                          children: [
-                                            const Icon(Icons.lock,
-                                                color: Colors.red),
-                                            const SizedBox(width: 8),
-                                            Text("비공개 방 입장"),
-                                          ],
-                                        ),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              "방 이름: ${room.name}",
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.w600),
-                                            ),
-                                            const SizedBox(height: 12),
-                                            TextField(
-                                              controller: controller,
-                                              obscureText: true,
-                                              decoration: const InputDecoration(
-                                                hintText: "비밀번호를 입력하세요",
-                                                border: OutlineInputBorder(),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context, null),
-                                            child: const Text("취소"),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () => Navigator.pop(
-                                                context, controller.text),
-                                            child: const Text("입장"),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-
-                                    if (input == null) return;
-
-                                    if (input != room.password) {
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => AlertDialog(
-                                          title: const Text("입장 실패"),
-                                          content: const Text("❌ 비밀번호가 틀렸습니다"),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(context),
-                                              child: const Text("확인"),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      return;
-                                    }
+                                    print(
+                                        "✅ 입장 성공: roomId=${room.id}, roomName=${room.name}");
 
                                     Navigator.push(
                                       context,
@@ -404,7 +305,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                         builder: (_) => ChatPage(
                                           roomId: room.id.toString(),
                                           roomName: room.name,
-                                           isPrivate: true,
+                                          isPrivate: true,
                                         ),
                                       ),
                                     );

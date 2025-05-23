@@ -176,6 +176,7 @@ class ChatApiService {
     final headers = await _authHeaders();
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId') ?? '';
+    print('🧪 userId: $userId');
 
     final response = await http.get(
       Uri.parse(
