@@ -1,4 +1,5 @@
-import 'package:CHAT_SHIRE/model/chat_room.dart';
+import 'package:CHAT_SHIRE/model/private_chat_room.dart';
+import 'package:CHAT_SHIRE/model/user.dart';
 import 'package:CHAT_SHIRE/util/route_path.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,8 +20,9 @@ class ChatRoomPrivateListPage extends StatefulWidget {
 }
 
 class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
-  List<ChatRoom> allRooms = [];
-  List<ChatRoom> filteredRooms = [];
+  List<PrivateChatRoom> allRooms = [];
+  List<PrivateChatRoom> filteredRooms = [];
+
   Map<String, int> participantCache = {};
   bool isLoading = true;
   String searchKeyword = "";
@@ -46,16 +48,13 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
     setState(() => isLoading = true);
     try {
       // 모든 방을 가져온 후 비공개 방만 필터링
-      final rooms = await ChatApiService.fetchRoomList();
-      final privateRooms = rooms
-          .where((room) => room.password != null && room.password!.isNotEmpty)
-          .toList();
+      final rooms = await ChatApiService.fetchPrivateRoomList();
 
       setState(() {
-        allRooms = privateRooms;
+        allRooms = rooms;
         _applyFilter();
       });
-      _fetchParticipantsForRooms(privateRooms);
+      // _fetchParticipantsForRooms(rooms);
 
       connectStompForRoomList((roomId, count) {
         setState(() {
@@ -63,19 +62,53 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
         });
       });
     } catch (e) {
-      print("❌ 비공개 채팅방 목록 오류: $e");
+      print("❌ 개인 채팅방 목록 오류: $e");
     } finally {
       setState(() => isLoading = false);
     }
   }
 
-  Future<void> _fetchParticipantsForRooms(List<ChatRoom> rooms) async {
-    for (var room in rooms) {
-      final roomId = room.id.toString();
-      final count = await ChatApiService.fetchParticipantCount(roomId);
-      setState(() {
-        participantCache[roomId] = count;
-      });
+  // Future<void> _fetchParticipantsForRooms(List<ChatRoom> rooms) async {
+  //   for (var room in rooms) {
+  //     final roomId = room.id.toString();
+  //     final count = await ChatApiService.fetchParticipantCount(roomId);
+  //     setState(() {
+  //       participantCache[roomId] = count;
+  //     });
+  //   }
+  // }
+
+  void _showUserSelectDialog() async {
+    try {
+      final users = await ChatApiService.fetchAllUsers(); // 전체 사용자 가져오기
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('대화할 유저 선택'),
+          content: SizedBox(
+            width: 300,
+            height: 400,
+            child: ListView.builder(
+              itemCount: users.length,
+              itemBuilder: (_, index) {
+                final user = users[index];
+                return ListTile(
+                  title: Text(user.name),
+                  onTap: () {
+                    Navigator.pop(context); // 팝업 닫기
+                    _showCreatePrivateRoomDialog(user); // ✅ 여기서 함수 호출
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      print('❌ 유저 목록 조회 실패: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("유저 목록 불러오기 실패")),
+      );
     }
   }
 
@@ -86,13 +119,14 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
     });
   }
 
-  void _showCreatePrivateRoomDialog() {
-    final TextEditingController nameController = TextEditingController();
+  void _showCreatePrivateRoomDialog(User inviteUser) {
+    final nameController = TextEditingController(text: inviteUser.name);
     final passwordController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("🔒 새 비공개 채팅방 만들기"),
+        title: Text("${inviteUser.name}님과 채팅하시겠습니까?"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -104,10 +138,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
             TextField(
               controller: passwordController,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "비밀번호 (필수)",
-                hintText: "비공개 방에는 비밀번호가 필수입니다",
-              ),
+              decoration: const InputDecoration(labelText: "비밀번호 (선택)"),
             ),
           ],
         ),
@@ -120,40 +151,39 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
             onPressed: () async {
               final name = nameController.text.trim();
               final password = passwordController.text.trim();
+              final inviteId = inviteUser.id;
 
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("방 이름을 입력해주세요")),
-                );
-                return;
-              }
-
-              if (password.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("비공개 방에는 비밀번호가 필수입니다")),
-                );
-                return;
-              }
+              final prefs = await SharedPreferences.getInstance();
+              final createId = prefs.getString('userId') ?? '';
 
               try {
-                final prefs = await SharedPreferences.getInstance();
-                final createId = prefs.getString('userId') ?? '';
-
-                await ChatApiService.createRoom(name, password, createId);
-                Navigator.pop(context);
-                _fetchPrivateRooms(); // 방 생성 후 목록 새로고침
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("🔒 비공개 채팅방이 생성되었습니다")),
+                final roomId = await ChatApiService.createPrivateRoom(
+                  name,
+                  password,
+                  createId,
+                  inviteId,
                 );
+
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      roomId: roomId.toString(),
+                      roomName: name,
+                    ),
+                  ),
+                );
+                _fetchPrivateRooms(); // 새로고침
               } catch (e) {
-                print('❌ 비공개 방 생성 오류: $e');
+                print('🔍 방 생성 요청2 - createId: $createId');
+                print('❌ 방 생성 오류: $e');
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('방 생성 실패: $e')),
+                  SnackBar(content: Text("생성 실패: $e")),
                 );
               }
             },
-            child: const Text("생성"),
+            child: const Text("확인"),
           ),
         ],
       ),
@@ -164,7 +194,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://97a1-118-131-64-204.ngrok-free.app/ws-chat',
+        url: 'https://c341-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           for (var room in allRooms) {
@@ -207,7 +237,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
             ),
             IconButton(
               icon: const Icon(Icons.add),
-              onPressed: _showCreatePrivateRoomDialog,
+              onPressed: _showUserSelectDialog,
             ),
           ],
         ),
@@ -260,10 +290,10 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                             itemBuilder: (context, index) {
                               final room = filteredRooms[index];
                               final roomId = room.id.toString();
-                              final count = participantCache[roomId];
-                              final countText = (count != null)
-                                  ? "👥 $count명 참여중"
-                                  : "참여자 수 로딩 중...";
+                              // final count = participantCache[roomId];
+                              // final countText = (count != null)
+                              //     ? "👥 $count명 참여중"
+                              //     : "참여자 수 로딩 중...";
 
                               return Card(
                                 elevation: 3,
@@ -283,12 +313,16 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                     // 마스터이거나 방 생성자인 경우 비밀번호 없이 입장
                                     if (role == "ROLE_MASTER" ||
                                         room.createId == userId) {
+                                      print(
+                                          "✅ 입장 성공: roomId=${room.id}, roomName=${room.name}");
+
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) => ChatPage(
                                             roomId: room.id.toString(),
                                             roomName: room.name,
+                                             isPrivate: true,
                                           ),
                                         ),
                                       );
@@ -370,6 +404,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                         builder: (_) => ChatPage(
                                           roomId: room.id.toString(),
                                           roomName: room.name,
+                                           isPrivate: true,
                                         ),
                                       ),
                                     );

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:CHAT_SHIRE/model/chat_room.dart';
 import 'package:CHAT_SHIRE/util/route_path.dart';
 import 'package:flutter/material.dart';
@@ -36,10 +34,10 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
-      final username = prefs.getString('username') ?? 'UnknownUser';
-  
-  print('🔍 SharedPreferences에서 가져온 username: $username');
-  print('🔍 UTF-8 바이트: ${utf8.encode(username)}');
+    final username = prefs.getString('username') ?? 'UnknownUser';
+
+    // print('🔍 SharedPreferences에서 가져온 username: $username');
+    // print('🔍 UTF-8 바이트: ${utf8.encode(username)}');
     setState(() {
       role = prefs.getString('role') ?? '';
       userId = prefs.getString('userId') ?? '';
@@ -139,7 +137,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://97a1-118-131-64-204.ngrok-free.app/ws-chat',
+        url: 'https://c341-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           // 🔥 각 방에 대한 참여자 수 구독

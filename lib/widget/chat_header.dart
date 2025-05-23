@@ -6,8 +6,8 @@ import '../service/chat_stomp_service.dart';
 
 class ChatHeader extends StatefulWidget {
   final String roomId;
-
-  const ChatHeader({super.key, required this.roomId});
+  final bool isPrivate;
+  const ChatHeader({super.key, required this.roomId,this.isPrivate = false, });
 
   @override
   State<ChatHeader> createState() => _ChatHeaderState();

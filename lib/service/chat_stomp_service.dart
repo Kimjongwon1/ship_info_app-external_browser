@@ -9,34 +9,45 @@ late StompClient stompClient;
 bool isStompConnected = false;
 
 /// ✅ 방 구독
-void connectStomp(String roomId, Function(Map<String, dynamic>) onMessage,
-    {VoidCallback? onConnected}) {
-  // 🔄 이전 연결이 있으면 종료
+void connectStomp(
+  String roomId,
+  Function(Map<String, dynamic>) onMessage, {
+  VoidCallback? onConnected,
+  bool isPrivate = false,
+}) async {
+  final destination =
+      isPrivate ? '/sub/chat/private/$roomId' : '/sub/chat/$roomId';
+
   if (stompClient.connected) {
-    stompClient.deactivate();
+    stompClient.deactivate(); // ✅ 반드시 기다려야 함
   }
 
   stompClient = StompClient(
     config: StompConfig.SockJS(
-      url: 'https://97a1-118-131-64-204.ngrok-free.app/ws-chat',
+      url: 'https://c341-118-131-64-204.ngrok-free.app/ws-chat',
       onConnect: (StompFrame frame) {
         isStompConnected = true;
+        print("📡 STOMP 연결됨 → 구독 주소: $destination");
 
-        // 🔄 메시지 수신 구독
-        stompClient.subscribe(
-          destination: '/sub/chat/$roomId',
-          callback: (StompFrame frame) {
-            final data = jsonDecode(frame.body!);
-            onMessage(data);
-          },
-        );
-
-        onConnected?.call();
+        // ✅ 안전하게 마이크로태스크로 subscribe 지연
+        Future.microtask(() {
+          try {
+            stompClient.subscribe(
+              destination: destination,
+              callback: (StompFrame frame) {
+                final data = jsonDecode(frame.body!);
+                onMessage(data);
+              },
+            );
+            onConnected?.call();
+          } catch (e) {
+            print("❌ subscribe 실패: $e");
+          }
+        });
       },
-      onWebSocketError: (dynamic error) => print('❌ WebSocket Error: $error'),
       onDisconnect: (frame) {
         isStompConnected = false;
-        // print("🔌 STOMP disconnected");
+        print("🔌 STOMP 연결 종료됨");
       },
     ),
   );
@@ -68,13 +79,22 @@ void subscribeParticipantCount(String roomId, Function(int) onUpdate) {
 }
 
 /// ✅ 메시지 전송
-void sendMessage(String sender, String message, String roomId) {
-  final msg = {
+void sendMessage(String sender, String message, String roomId,
+    {bool isPrivate = false}) {
+  final dest = isPrivate ? '/pub/chat/private/message' : '/pub/chat/message';
+
+  final body = jsonEncode({
     'sender': sender,
     'message': message,
     'roomId': roomId,
-  };
-  stompClient.send(destination: '/pub/chat/message', body: jsonEncode(msg));
+  });
+
+  stompClient.send(
+    destination: dest,
+    body: body,
+  );
+
+  debugPrint('📤 메시지 전송 → $dest : $body');
 }
 
 /// ✅ 참여 이벤트 전송 (초기 진입 시 또는 보정용)

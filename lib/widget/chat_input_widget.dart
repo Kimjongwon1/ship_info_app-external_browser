@@ -4,9 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../service/chat_stomp_service.dart'; // STOMP 전송 함수 위치
 
 class ChatInputWidget extends StatefulWidget {
-  final String roomId; // ✅ roomId 전달받음
-
-  const ChatInputWidget({super.key, required this.roomId});
+  final String roomId;
+  final bool isPrivate;
+  const ChatInputWidget(
+      {super.key, required this.roomId, this.isPrivate = false});
 
   @override
   State<ChatInputWidget> createState() => _ChatInputWidgetState();
@@ -20,7 +21,7 @@ class _ChatInputWidgetState extends State<ChatInputWidget> {
     if (text.isNotEmpty) {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString('username') ?? 'Unknown';
-      sendMessage(username, text, widget.roomId);
+      sendMessage(username, text, widget.roomId, isPrivate: widget.isPrivate);
       _controller.clear();
     }
   }

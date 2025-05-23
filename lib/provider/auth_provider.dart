@@ -17,7 +17,7 @@ class AuthNotifier extends StateNotifier<bool> {
     print('🔍 요청 username UTF-8 바이트: ${utf8.encode(username)}');
 
     final response = await http.post(
-      Uri.parse('https://97a1-118-131-64-204.ngrok-free.app/api/login'),
+      Uri.parse('https://c341-118-131-64-204.ngrok-free.app/api/login'),
       headers: {
         'Content-Type': 'application/json; charset=utf-8', // 🔧 charset 추가
         'Accept-Charset': 'utf-8', // 🔧 응답 charset 명시

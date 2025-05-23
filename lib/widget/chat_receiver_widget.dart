@@ -7,8 +7,12 @@ import 'chat_message_widget.dart';
 
 class ChatReceiverWidget extends StatefulWidget {
   final String roomId;
-
-  const ChatReceiverWidget({super.key, required this.roomId});
+  final bool isPrivate;
+  const ChatReceiverWidget({
+    super.key,
+    required this.roomId,
+    this.isPrivate = false,
+  });
 
   @override
   State<ChatReceiverWidget> createState() => _ChatReceiverWidgetState();
@@ -58,7 +62,12 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
       },
       onConnected: () {
         setState(() => stompReady = true);
-        _sendJoinEvent(); // ✅ 연결 후 join 보냄
+        if (!widget.isPrivate) {
+          _sendJoinEvent(); // 공개방일 때만
+          subscribeParticipantCount(widget.roomId, (count) {
+            debugPrint("👥 참여자 수 업데이트: $count");
+          });
+        }
       },
     );
   }
@@ -72,7 +81,10 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
   }
 
   Future<void> _loadHistory() async {
-    final history = await ChatApiService.fetchChatHistoryByRoom(widget.roomId);
+    final history = widget.isPrivate
+        ? await ChatApiService.fetchPrivateChatHistoryByRoom(widget.roomId)
+        : await ChatApiService.fetchChatHistoryByRoom(widget.roomId);
+
     setState(() {
       messages.addAll(history);
       _sortMessages();

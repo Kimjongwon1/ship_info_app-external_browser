@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:CHAT_SHIRE/app.dart';
+import 'package:CHAT_SHIRE/model/private_chat_room.dart';
+import 'package:CHAT_SHIRE/model/user.dart';
 import 'package:CHAT_SHIRE/util/route_path.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -10,9 +12,9 @@ import '../model/chat_room.dart';
 
 class ChatApiService {
   static const String baseUrl =
-      'https://97a1-118-131-64-204.ngrok-free.app/api/chat';
+      'https://c341-118-131-64-204.ngrok-free.app/api/chat';
   static const String roomBaseUrl =
-      'https://97a1-118-131-64-204.ngrok-free.app/api/room';
+      'https://c341-118-131-64-204.ngrok-free.app/api/room';
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -115,10 +117,25 @@ class ChatApiService {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> fetchPrivateChatHistoryByRoom(
+      String roomId) async {
+    final response =
+        await http.get(Uri.parse('$baseUrl/api/chat/history/private/$roomId'));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> jsonList =
+          jsonDecode(utf8.decode(response.bodyBytes));
+      return jsonList.cast<Map<String, dynamic>>();
+    } else {
+      debugPrint('❌ 개인 채팅 히스토리 로드 실패: ${response.statusCode}');
+      return [];
+    }
+  }
+
   static Future<int> fetchParticipantCountDirect(String roomId) async {
     final headers = await _authHeaders();
     final url = Uri.parse(
-        'https://97a1-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
+        'https://c341-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
     final response = await http.get(url, headers: headers);
 
     if (response.statusCode == 200) {
@@ -127,6 +144,61 @@ class ChatApiService {
     } else {
       debugPrint("❌ 서버 응답코드: ${response.statusCode}, 응답본문: ${response.body}");
       throw Exception("Failed to fetch direct participant count");
+    }
+  }
+
+  static Future<int> createPrivateRoom(
+      String name, String password, String createId, String inviteId) async {
+    final headers = await _authHeaders();
+    final response = await http.post(
+      Uri.parse(
+          'https://c341-118-131-64-204.ngrok-free.app/api/room/private/create'),
+      headers: headers,
+      body: jsonEncode({
+        'name': name,
+        'password': password,
+        'createId': createId,
+        'inviteId': inviteId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['roomId']; // 생성된 방 id 리턴
+    } else {
+      throw Exception('❌ 개인 채팅방 생성 실패: ${response.body}');
+    }
+  }
+
+  static Future<List<PrivateChatRoom>> fetchPrivateRoomList() async {
+    final headers = await _authHeaders();
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId') ?? '';
+
+    final response = await http.get(
+      Uri.parse(
+          'https://c341-118-131-64-204.ngrok-free.app/api/room/myprivateroom/list?userId=$userId'),
+      headers: headers,
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+      return data.map((e) => PrivateChatRoom.fromJson(e)).toList();
+    } else {
+      throw Exception('❌ 비공개 채팅방 목록 조회 실패: ${response.statusCode}');
+    }
+  }
+
+  static Future<List<User>> fetchAllUsers() async {
+    final headers = await _authHeaders();
+    final response =
+        await http.get(Uri.parse('$roomBaseUrl/users'), headers: headers);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+      return data.map((e) => User.fromJson(e)).toList();
+    } else {
+      throw Exception('유저 목록 조회 실패: ${response.statusCode}');
     }
   }
 }
