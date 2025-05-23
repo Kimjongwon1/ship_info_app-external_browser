@@ -56,12 +56,19 @@ void connectStomp(
 }
 
 /// ✅ 참여자 수 구독
-void subscribeParticipantCount(String roomId, Function(int) onUpdate) {
+void subscribeParticipantCount(String roomId, Function(int) onUpdate,
+    {bool isPrivate = false}) {
   if (!stompClient.connected) {
     print("⚠️ STOMP 연결되지 않음 → 참여자 구독 실패");
     return;
   }
 
+  if (isPrivate) {
+    print("🛑 개인 채팅방 → 참여자 수 구독 생략");
+    return;
+  }
+
+  print("📡 STOMP 연결됨 → 참여자 수 구독 시작");
   stompClient.subscribe(
     destination: '/sub/chat/participants/$roomId',
     callback: (frame) {
@@ -69,7 +76,6 @@ void subscribeParticipantCount(String roomId, Function(int) onUpdate) {
       if (count != null) {
         onUpdate(count);
 
-        // 💡 0명일 경우 재참여 보정용 로그
         if (count == 0) {
           print("⚠️ 참여자 수 0 → STOMP 재참여 필요할 수 있음");
         }

@@ -119,8 +119,10 @@ class ChatApiService {
 
   static Future<List<Map<String, dynamic>>> fetchPrivateChatHistoryByRoom(
       String roomId) async {
-    final response =
-        await http.get(Uri.parse('$baseUrl/api/chat/history/private/$roomId'));
+    final headers = await _authHeaders();
+
+    final response = await http
+        .get(Uri.parse('$baseUrl/history/private/$roomId'), headers: headers);
 
     if (response.statusCode == 200) {
       final List<dynamic> jsonList =

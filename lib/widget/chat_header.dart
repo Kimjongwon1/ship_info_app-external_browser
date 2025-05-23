@@ -7,7 +7,11 @@ import '../service/chat_stomp_service.dart';
 class ChatHeader extends StatefulWidget {
   final String roomId;
   final bool isPrivate;
-  const ChatHeader({super.key, required this.roomId,this.isPrivate = false, });
+  const ChatHeader({
+    super.key,
+    required this.roomId,
+    this.isPrivate = false,
+  });
 
   @override
   State<ChatHeader> createState() => _ChatHeaderState();
@@ -88,6 +92,12 @@ class _ChatHeaderState extends State<ChatHeader> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isPrivate) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: Text("🔒 1:1 채팅방입니다", style: TextStyle(fontSize: 16)),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Text("👥 현재 참여자: $participantCount명",

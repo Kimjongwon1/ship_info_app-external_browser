@@ -27,6 +27,8 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
   @override
   void initState() {
     super.initState();
+    print(
+        "🧪 ChatReceiverWidget init → roomId: ${widget.roomId}, isPrivate: ${widget.isPrivate}");
     _initUserAndConnect();
     _loadHistory();
   }
@@ -35,9 +37,6 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
     final prefs = await SharedPreferences.getInstance();
     final username = prefs.getString('username') ?? 'UnknownUser';
     currentUser = username;
-
-    // 🔍 현재 사용자명 확인 (정상 동작 확인용 - 나중에 제거 가능)
-    // print('🔍 현재 사용자: $currentUser');
 
     connectStomp(
       widget.roomId,
@@ -62,13 +61,18 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
       },
       onConnected: () {
         setState(() => stompReady = true);
-        if (!widget.isPrivate) {
-          _sendJoinEvent(); // 공개방일 때만
-          subscribeParticipantCount(widget.roomId, (count) {
-            debugPrint("👥 참여자 수 업데이트: $count");
-          });
+
+        if (widget.isPrivate) {
+          print("🛑 개인 채팅방 → 참여자 수 구독 생략");
+          return;
         }
+
+        _sendJoinEvent();
+        subscribeParticipantCount(widget.roomId, (count) {
+          debugPrint("👥 참여자 수 업데이트: $count");
+        }, isPrivate: widget.isPrivate);
       },
+      isPrivate: widget.isPrivate,
     );
   }
 
