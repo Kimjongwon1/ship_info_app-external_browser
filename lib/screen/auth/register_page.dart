@@ -59,7 +59,7 @@ class RegisterPage extends ConsumerWidget {
 
                 final response = await http.post(
                   Uri.parse(
-                      'https://c341-118-131-64-204.ngrok-free.app/api/register'),
+                      'https://11e7-118-131-64-204.ngrok-free.app/api/register'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({'username': id, 'password': pw}),
                 );

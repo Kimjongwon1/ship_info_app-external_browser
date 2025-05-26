@@ -82,27 +82,145 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   void _showUserSelectDialog() async {
     try {
       final users = await ChatApiService.fetchAllUsers();
+      String searchQuery = ''; // 검색어를 다이얼로그 밖에 선언
+
       showDialog(
         context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('대화할 유저 선택'),
-          content: SizedBox(
-            width: 300,
-            height: 400,
-            child: ListView.builder(
-              itemCount: users.length,
-              itemBuilder: (_, index) {
-                final user = users[index];
-                return ListTile(
-                  title: Text(user.name),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showCreatePrivateRoomDialog(user);
-                  },
-                );
-              },
-            ),
-          ),
+        builder: (_) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            // 검색어를 기반으로 유저 필터링
+            final filteredUsers = users.where((user) {
+              if (searchQuery.isEmpty) return true;
+              return user.name
+                      .toLowerCase()
+                      .contains(searchQuery.toLowerCase()) ||
+                  user.id.toLowerCase().contains(searchQuery.toLowerCase());
+            }).toList();
+
+            return AlertDialog(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('대화할 유저 선택'),
+                  // IconButton(
+                  //   icon: const Icon(Icons.close),
+                  //   onPressed: () => Navigator.pop(context),
+                  // ),
+                ],
+              ),
+              content: SizedBox(
+                width: 300,
+                height: 400,
+                child: Column(
+                  children: [
+                    // 검색 필드
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: '이름 또는 ID로 검색...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 10),
+                      ),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          searchQuery = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    // 검색 결과 수 표시
+                    Text(
+                      '${filteredUsers.length}명의 유저',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // 검색 결과 표시
+                    if (filteredUsers.isEmpty)
+                      const Expanded(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.search_off,
+                                  size: 48, color: Colors.grey),
+                              SizedBox(height: 8),
+                              Text(
+                                '검색 결과가 없습니다',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: filteredUsers.length,
+                          itemBuilder: (_, index) {
+                            final user = filteredUsers[index];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.blue.shade100,
+                                  child: Text(
+                                    user.name.isNotEmpty
+                                        ? user.name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: Colors.blue.shade800,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                title: Text(
+                                  user.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  user.id,
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                // trailing: Icon(
+                                //   Icons.chat_bubble_outline,
+                                //   color: Colors.blue.shade400,
+                                // ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _showCreatePrivateRoomDialog(user);
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('취소'),
+                ),
+              ],
+            );
+          },
         ),
       );
     } catch (e) {
@@ -185,7 +303,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://c341-118-131-64-204.ngrok-free.app/ws-chat',
+        url: 'https://11e7-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           for (var room in allRooms) {
@@ -296,9 +414,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                         fontWeight: FontWeight.w600),
                                   ),
                                   onTap: () async {
-                                    print(
-                                        "✅ 입장 성공: roomId=${room.id}, roomName=${room.name}");
-
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -344,8 +459,8 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
                                             if (confirm == true) {
                                               try {
-                                                await ChatApiService.deleteRoom(
-                                                    room.id);
+                                                await ChatApiService
+                                                    .privatedeleteRoom(room.id);
                                                 _fetchPrivateRooms();
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
