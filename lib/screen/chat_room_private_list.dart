@@ -1,3 +1,5 @@
+import 'dart:convert'; // JSON 파싱을 위해 추가
+
 import 'package:CHAT_SHIRE/model/private_chat_room.dart';
 import 'package:CHAT_SHIRE/model/user.dart';
 import 'package:CHAT_SHIRE/util/route_path.dart';
@@ -22,18 +24,21 @@ class ChatRoomPrivateListPage extends StatefulWidget {
 class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   List<PrivateChatRoom> allRooms = [];
   List<PrivateChatRoom> filteredRooms = [];
+  Map<String, String> roomDisplayNames = {}; // roomId -> displayName 매핑
 
   Map<String, int> participantCache = {};
   bool isLoading = true;
   String searchKeyword = "";
   String role = '';
   String userId = '';
+  late StompClient roomInviteClient; // 방 초대 알림용 클라이언트
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _fetchPrivateRooms();
+    _subscribeToRoomInvitations(); // 초대 알림 구독 추가
   }
 
   Future<void> _loadUserData() async {
@@ -42,6 +47,125 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       role = prefs.getString('role') ?? '';
       userId = prefs.getString('userId') ?? '';
     });
+  }
+
+  // 개인 채팅방 초대 알림 구독
+  void _subscribeToRoomInvitations() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentUserId = prefs.getString('userId') ?? '';
+
+    if (currentUserId.isEmpty) return;
+
+    roomInviteClient = StompClient(
+      config: StompConfig.SockJS(
+        url: 'https://1970-118-131-64-204.ngrok-free.app/ws-chat',
+        onConnect: (StompFrame frame) {
+          print('✅ 방 초대 알림 WebSocket 연결됨');
+
+          // 나에게 온 초대 알림 구독
+          roomInviteClient.subscribe(
+            destination: '/sub/private-room/invite/$currentUserId',
+            callback: (frame) {
+              print('📨 새 개인 채팅방 초대: ${frame.body}');
+
+              try {
+                // JSON 파싱
+                final Map<String, dynamic> roomData =
+                    jsonDecode(frame.body ?? '{}');
+                final data = jsonDecode(frame.body ?? '{}');
+
+                // ✅ 삭제 알림인 경우
+                if (data['action'] == 'delete') {
+                  final deletedRoomId = data['roomId'];
+                  print('🗑 삭제 알림 수신 → roomId: $deletedRoomId');
+
+                  setState(() {
+                    allRooms.removeWhere((room) => room.id == deletedRoomId);
+                    filteredRooms
+                        .removeWhere((room) => room.id == deletedRoomId);
+                    roomDisplayNames.remove(deletedRoomId.toString());
+                  });
+
+                  return;
+                }
+                final newRoom = PrivateChatRoom(
+                  id: roomData['id'],
+                  name: roomData['name'],
+                  password: roomData['password'] ?? '',
+                  createId: roomData['createId'],
+                  inviteId: roomData['inviteId'],
+                );
+
+                // 실시간으로 방 목록에 추가
+                setState(() {
+                  // 중복 체크
+                  if (!allRooms.any((room) => room.id == newRoom.id)) {
+                    allRooms.add(newRoom);
+
+                    // 표시 이름 설정
+                    _updateRoomDisplayName(newRoom);
+
+                    // 필터 재적용
+                    _applyFilter();
+                  }
+                });
+
+                // 알림 표시
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          '${roomDisplayNames[newRoom.id.toString()] ?? newRoom.name}이 생성되었습니다'),
+                      duration: const Duration(seconds: 3),
+                      action: SnackBarAction(
+                        label: '입장',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatPage(
+                                roomId: newRoom.id.toString(),
+                                roomName:
+                                    roomDisplayNames[newRoom.id.toString()] ??
+                                        newRoom.name,
+                                isPrivate: true,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                print('❌ 방 초대 알림 파싱 오류: $e');
+              }
+            },
+          );
+        },
+        onWebSocketError: (error) => print('❌ 방 초대 알림 WebSocket 오류: $error'),
+      ),
+    );
+    roomInviteClient.activate();
+  }
+
+  // 단일 방의 표시 이름 업데이트
+  void _updateRoomDisplayName(PrivateChatRoom room) async {
+    if (room.createId == userId && room.inviteId == userId) {
+      roomDisplayNames[room.id.toString()] = "나와의 채팅";
+    } else if (room.inviteId == userId) {
+      // 초대한 사람의 이름 가져오기
+      try {
+        final users = await ChatApiService.fetchAllUsers();
+        final creator = users.firstWhere((user) => user.id == room.createId,
+            orElse: () => User(id: room.createId, name: room.createId));
+        roomDisplayNames[room.id.toString()] = "${creator.name}님과의 1대1 채팅방";
+      } catch (e) {
+        roomDisplayNames[room.id.toString()] = "${room.createId}님과의 1대1 채팅방";
+      }
+    } else {
+      roomDisplayNames[room.id.toString()] = room.name;
+    }
   }
 
   Future<void> _fetchPrivateRooms() async {
@@ -54,6 +178,26 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       final visibleRooms = rooms
           .where((room) => room.createId == userId || room.inviteId == userId)
           .toList();
+
+      // 모든 유저 정보를 가져와서 이름을 매핑
+      final users = await ChatApiService.fetchAllUsers();
+      final userMap = {for (var user in users) user.id: user.name};
+
+      // 각 방에 대해 표시할 이름을 설정
+      roomDisplayNames.clear();
+      for (var room in visibleRooms) {
+        if (room.createId == userId && room.inviteId == userId) {
+          // 생성자와 초대자가 모두 나인 경우: 나와의 채팅
+          roomDisplayNames[room.id.toString()] = "나와의 채팅";
+        } else if (room.inviteId == userId) {
+          // 내가 초대받은 경우: 방을 만든 사람의 이름을 표시
+          final creatorName = userMap[room.createId] ?? room.createId;
+          roomDisplayNames[room.id.toString()] = "$creatorName님과의 1대1 채팅방";
+        } else {
+          // 내가 만든 경우: 기존 방 이름 유지
+          roomDisplayNames[room.id.toString()] = room.name;
+        }
+      }
 
       setState(() {
         allRooms = visibleRooms;
@@ -74,21 +218,22 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
   void _applyFilter() {
     setState(() {
-      filteredRooms =
-          allRooms.where((room) => room.name.contains(searchKeyword)).toList();
+      filteredRooms = allRooms.where((room) {
+        final displayName = roomDisplayNames[room.id.toString()] ?? room.name;
+        return displayName.contains(searchKeyword);
+      }).toList();
     });
   }
 
   void _showUserSelectDialog() async {
     try {
       final users = await ChatApiService.fetchAllUsers();
-      String searchQuery = ''; // 검색어를 다이얼로그 밖에 선언
+      String searchQuery = '';
 
       showDialog(
         context: context,
         builder: (_) => StatefulBuilder(
           builder: (dialogContext, setDialogState) {
-            // 검색어를 기반으로 유저 필터링
             final filteredUsers = users.where((user) {
               if (searchQuery.isEmpty) return true;
               return user.name
@@ -102,10 +247,10 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('대화할 유저 선택'),
-                  // IconButton(
-                  //   icon: const Icon(Icons.close),
-                  //   onPressed: () => Navigator.pop(context),
-                  // ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 ],
               ),
               content: SizedBox(
@@ -113,7 +258,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                 height: 400,
                 child: Column(
                   children: [
-                    // 검색 필드
                     TextField(
                       decoration: InputDecoration(
                         hintText: '이름 또는 ID로 검색...',
@@ -131,7 +275,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                       },
                     ),
                     const SizedBox(height: 10),
-                    // 검색 결과 수 표시
                     Text(
                       '${filteredUsers.length}명의 유저',
                       style: TextStyle(
@@ -140,7 +283,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    // 검색 결과 표시
                     if (filteredUsers.isEmpty)
                       const Expanded(
                         child: Center(
@@ -197,10 +339,10 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                     fontSize: 12,
                                   ),
                                 ),
-                                // trailing: Icon(
-                                //   Icons.chat_bubble_outline,
-                                //   color: Colors.blue.shade400,
-                                // ),
+                                trailing: Icon(
+                                  Icons.chat_bubble_outline,
+                                  color: Colors.blue.shade400,
+                                ),
                                 onTap: () {
                                   Navigator.pop(context);
                                   _showCreatePrivateRoomDialog(user);
@@ -232,7 +374,57 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   }
 
   void _showCreatePrivateRoomDialog(User inviteUser) {
-    final nameController = TextEditingController(text: inviteUser.name);
+    // 먼저 해당 유저와의 채팅방이 이미 있는지 확인
+    PrivateChatRoom? existingRoom;
+    try {
+      existingRoom = allRooms.firstWhere((room) =>
+          (room.createId == userId && room.inviteId == inviteUser.id) ||
+          (room.createId == inviteUser.id && room.inviteId == userId));
+    } catch (e) {
+      // 찾지 못한 경우 null로 유지
+      existingRoom = null;
+    }
+
+    if (existingRoom != null) {
+      // 이미 채팅방이 있으면 안내하고 바로 입장 옵션 제공
+      final displayName =
+          roomDisplayNames[existingRoom.id.toString()] ?? existingRoom.name;
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("알림"),
+          content: Text("${inviteUser.name}님과의 채팅방이 이미 존재합니다."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("취소"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      roomId: existingRoom!.id.toString(),
+                      roomName: displayName,
+                      isPrivate: true,
+                    ),
+                  ),
+                );
+              },
+              child: const Text("채팅방 입장"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // 기존 방이 없는 경우에만 새로 생성
+    final nameController =
+        TextEditingController(text: "${inviteUser.name}님과의 1대1 채팅방");
     final passwordController = TextEditingController();
 
     showDialog(
@@ -244,7 +436,11 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: "방 이름"),
+              decoration: const InputDecoration(
+                labelText: "방 이름",
+                helperText: "원하시는 방 이름으로 변경할 수 있습니다",
+              ),
+              maxLines: 1,
             ),
           ],
         ),
@@ -264,7 +460,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
               try {
                 final roomId = await ChatApiService.createPrivateRoom(
-                  name,
+                  name.isEmpty ? "${inviteUser.name}님과의 1대1 채팅방" : name,
                   password,
                   createId,
                   inviteId,
@@ -276,12 +472,12 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
                       roomId: roomId.toString(),
-                      roomName: name,
+                      roomName:
+                          name.isEmpty ? "${inviteUser.name}님과의 1대1 채팅방" : name,
                       isPrivate: true,
                     ),
                   ),
                 ).then((_) {
-                  // ✅ 채팅방에서 돌아온 후 목록 자동 새로고침
                   _fetchPrivateRooms();
                 });
               } catch (e) {
@@ -303,7 +499,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://11e7-118-131-64-204.ngrok-free.app/ws-chat',
+        url: 'https://1970-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           for (var room in allRooms) {
@@ -399,6 +595,8 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                             itemBuilder: (context, index) {
                               final room = filteredRooms[index];
                               final roomId = room.id.toString();
+                              final displayName =
+                                  roomDisplayNames[roomId] ?? room.name;
 
                               return Card(
                                 elevation: 3,
@@ -409,7 +607,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                     size: 28,
                                   ),
                                   title: Text(
-                                    room.name,
+                                    displayName,
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600),
                                   ),
@@ -419,7 +617,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                       MaterialPageRoute(
                                         builder: (_) => ChatPage(
                                           roomId: room.id.toString(),
-                                          roomName: room.name,
+                                          roomName: displayName,
                                           isPrivate: true,
                                         ),
                                       ),
@@ -428,58 +626,53 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      if (room.createId == userId ||
-                                          role == "ROLE_MASTER")
-                                        IconButton(
-                                          icon: const Icon(Icons.delete,
-                                              color: Colors.red),
-                                          onPressed: () async {
-                                            final confirm = await showDialog(
-                                              context: context,
-                                              builder: (ctx) => AlertDialog(
-                                                title: const Text("비공개 방 삭제"),
-                                                content: Text(
-                                                    "'${room.name}' 방을 정말 삭제하시겠습니까?"),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(
-                                                            ctx, false),
-                                                    child: const Text("취소"),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(
-                                                            ctx, true),
-                                                    child: const Text("삭제"),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
+                                      IconButton(
+                                        icon: const Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () async {
+                                          final confirm = await showDialog(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text("비공개 방 삭제"),
+                                              content: Text(
+                                                  "'$displayName' 방을 정말 삭제하시겠습니까?"),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, false),
+                                                  child: const Text("취소"),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, true),
+                                                  child: const Text("삭제"),
+                                                ),
+                                              ],
+                                            ),
+                                          );
 
-                                            if (confirm == true) {
-                                              try {
-                                                await ChatApiService
-                                                    .privatedeleteRoom(room.id);
-                                                _fetchPrivateRooms();
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                      content: Text(
-                                                          "비공개 방이 삭제되었습니다")),
-                                                );
-                                              } catch (e) {
-                                                print('❌ 방 삭제 오류: $e');
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                      content:
-                                                          Text('삭제 실패: $e')),
-                                                );
-                                              }
+                                          if (confirm == true) {
+                                            try {
+                                              await ChatApiService
+                                                  .privatedeleteRoom(room.id);
+                                              _fetchPrivateRooms();
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                    content:
+                                                        Text("비공개 방이 삭제되었습니다")),
+                                              );
+                                            } catch (e) {
+                                              print('❌ 방 삭제 오류: $e');
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text('삭제 실패: $e')),
+                                              );
                                             }
-                                          },
-                                        ),
+                                          }
+                                        },
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -491,5 +684,15 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
               ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    // STOMP 클라이언트 정리
+    if (isStompConnected) {
+      stompClient.deactivate();
+    }
+    roomInviteClient.deactivate();
+    super.dispose();
   }
 }

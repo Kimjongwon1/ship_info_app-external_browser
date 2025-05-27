@@ -1,4 +1,5 @@
 import 'package:CHAT_SHIRE/screen/chat_room_list_page.dart';
+import 'package:CHAT_SHIRE/screen/ship_list_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -79,7 +80,7 @@ class LoginPage extends ConsumerWidget {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => const ChatRoomListPage()),
+                          builder: (_) => const ShipListPage()),
                     );
                   } else {
                     showDialog(

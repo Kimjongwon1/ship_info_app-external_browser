@@ -12,9 +12,9 @@ import '../model/chat_room.dart';
 
 class ChatApiService {
   static const String baseUrl =
-      'https://11e7-118-131-64-204.ngrok-free.app/api/chat';
+      'https://1970-118-131-64-204.ngrok-free.app/api/chat';
   static const String roomBaseUrl =
-      'https://11e7-118-131-64-204.ngrok-free.app/api/room';
+      'https://1970-118-131-64-204.ngrok-free.app/api/room';
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -147,7 +147,7 @@ class ChatApiService {
   static Future<int> fetchParticipantCountDirect(String roomId) async {
     final headers = await _authHeaders();
     final url = Uri.parse(
-        'https://11e7-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
+        'https://1970-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
     final response = await http.get(url, headers: headers);
 
     if (response.statusCode == 200) {
@@ -164,7 +164,7 @@ class ChatApiService {
     final headers = await _authHeaders();
     final response = await http.post(
       Uri.parse(
-          'https://11e7-118-131-64-204.ngrok-free.app/api/room/private/create'),
+          'https://1970-118-131-64-204.ngrok-free.app/api/room/private/create'),
       headers: headers,
       body: jsonEncode({
         'name': name,
@@ -190,7 +190,7 @@ class ChatApiService {
 
     final response = await http.get(
       Uri.parse(
-          'https://11e7-118-131-64-204.ngrok-free.app/api/room/myprivateroom/list?userId=$userId'),
+          'https://1970-118-131-64-204.ngrok-free.app/api/room/myprivateroom/list?userId=$userId'),
       headers: headers,
     );
 

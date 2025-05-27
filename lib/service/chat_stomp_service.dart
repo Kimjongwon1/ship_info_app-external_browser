@@ -24,7 +24,7 @@ void connectStomp(
 
   stompClient = StompClient(
     config: StompConfig.SockJS(
-      url: 'https://11e7-118-131-64-204.ngrok-free.app/ws-chat',
+      url: 'https://1970-118-131-64-204.ngrok-free.app/ws-chat',
       onConnect: (StompFrame frame) {
         isStompConnected = true;
         print("📡 STOMP 연결됨 → 구독 주소: $destination");
