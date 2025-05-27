@@ -650,58 +650,53 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      if (room.createId == userId ||
-                                          role == "ROLE_MASTER")
-                                        IconButton(
-                                          icon: const Icon(Icons.delete,
-                                              color: Colors.red),
-                                          onPressed: () async {
-                                            final confirm = await showDialog(
-                                              context: context,
-                                              builder: (ctx) => AlertDialog(
-                                                title: const Text("1대1 채팅방 삭제"),
-                                                content: Text(
-                                                    "'$displayName' 방을 정말 삭제하시겠습니까?"),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(
-                                                            ctx, false),
-                                                    child: const Text("취소"),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(
-                                                            ctx, true),
-                                                    child: const Text("삭제"),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
+                                      IconButton(
+                                        icon: const Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () async {
+                                          final confirm = await showDialog(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text("1대1 채팅방 삭제"),
+                                              content: Text(
+                                                  "'$displayName' 방을 정말 삭제하시겠습니까?"),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, false),
+                                                  child: const Text("취소"),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, true),
+                                                  child: const Text("삭제"),
+                                                ),
+                                              ],
+                                            ),
+                                          );
 
-                                            if (confirm == true) {
-                                              try {
-                                                await ChatApiService
-                                                    .privatedeleteRoom(room.id);
-                                                _fetchPrivateRooms();
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                      content: Text(
-                                                          "1대1 채팅방이 삭제되었습니다")),
-                                                );
-                                              } catch (e) {
-                                                print('❌ 방 삭제 오류: $e');
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                      content:
-                                                          Text('삭제 실패: $e')),
-                                                );
-                                              }
+                                          if (confirm == true) {
+                                            try {
+                                              await ChatApiService
+                                                  .privatedeleteRoom(room.id);
+                                              _fetchPrivateRooms();
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                    content: Text(
+                                                        "1대1 채팅방이 삭제되었습니다")),
+                                              );
+                                            } catch (e) {
+                                              print('❌ 방 삭제 오류: $e');
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text('삭제 실패: $e')),
+                                              );
                                             }
-                                          },
-                                        ),
+                                          }
+                                        },
+                                      ),
                                     ],
                                   ),
                                 ),
