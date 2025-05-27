@@ -66,7 +66,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
           roomInviteClient.subscribe(
             destination: '/sub/private-room/invite/$currentUserId',
             callback: (frame) {
-              print('📨 새 개인 채팅방 초대: ${frame.body}');
+              // print('📨 새 개인 채팅방 초대: ${frame.body}');
 
               try {
                 // JSON 파싱
@@ -77,7 +77,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                 // ✅ 삭제 알림인 경우
                 if (data['action'] == 'delete') {
                   final deletedRoomId = data['roomId'];
-                  print('🗑 삭제 알림 수신 → roomId: $deletedRoomId');
+                  // print('🗑 삭제 알림 수신 → roomId: $deletedRoomId');
 
                   setState(() {
                     allRooms.removeWhere((room) => room.id == deletedRoomId);
