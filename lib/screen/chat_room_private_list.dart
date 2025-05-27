@@ -50,6 +50,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   }
 
   // 개인 채팅방 초대 알림 구독
+  // 개인 채팅방 초대 알림 구독
   void _subscribeToRoomInvitations() async {
     final prefs = await SharedPreferences.getInstance();
     final currentUserId = prefs.getString('userId') ?? '';
@@ -66,34 +67,56 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
           roomInviteClient.subscribe(
             destination: '/sub/private-room/invite/$currentUserId',
             callback: (frame) {
-              // print('📨 새 개인 채팅방 초대: ${frame.body}');
+              print('📨 개인 채팅방 알림: ${frame.body}');
 
               try {
-                // JSON 파싱
-                final Map<String, dynamic> roomData =
+                // JSON 파싱 - 한 번만!
+                final Map<String, dynamic> data =
                     jsonDecode(frame.body ?? '{}');
-                final data = jsonDecode(frame.body ?? '{}');
 
                 // ✅ 삭제 알림인 경우
                 if (data['action'] == 'delete') {
-                  final deletedRoomId = data['roomId'];
-                  // print('🗑 삭제 알림 수신 → roomId: $deletedRoomId');
+                  final deletedRoomId = data['roomId'].toString();
+                  print('🗑 삭제 알림 수신 → roomId: $deletedRoomId');
 
                   setState(() {
-                    allRooms.removeWhere((room) => room.id == deletedRoomId);
-                    filteredRooms
-                        .removeWhere((room) => room.id == deletedRoomId);
-                    roomDisplayNames.remove(deletedRoomId.toString());
+                    allRooms.removeWhere(
+                        (room) => room.id.toString() == deletedRoomId);
+                    filteredRooms.removeWhere(
+                        (room) => room.id.toString() == deletedRoomId);
+                    roomDisplayNames.remove(deletedRoomId);
                   });
 
+                  // 삭제 알림 표시
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('채팅방이 삭제되었습니다'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+
+                  return; // ⭐️ 중요! 여기서 함수 종료
+                }
+
+                // ✅ 방 생성 알림 처리 (삭제가 아닌 경우에만 실행됨)
+                print('🏠 방 생성 알림 처리');
+
+                // null 체크 추가
+                if (data['id'] == null) {
+                  print('❌ 방 ID가 null입니다');
                   return;
                 }
+
                 final newRoom = PrivateChatRoom(
-                  id: roomData['id'],
-                  name: roomData['name'],
-                  password: roomData['password'] ?? '',
-                  createId: roomData['createId'],
-                  inviteId: roomData['inviteId'],
+                  id: data['id'] is int
+                      ? data['id']
+                      : int.tryParse(data['id'].toString()) ?? 0,
+                  name: data['name'] ?? '',
+                  password: data['password'] ?? '',
+                  createId: data['createId'] ?? '',
+                  inviteId: data['inviteId'] ?? '',
                 );
 
                 // 실시간으로 방 목록에 추가
@@ -110,8 +133,8 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                   }
                 });
 
-                // 알림 표시
-                if (mounted) {
+                // 알림 표시 (본인이 만든 방은 알림 표시 안 함)
+                if (mounted && newRoom.createId != currentUserId) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
@@ -138,7 +161,8 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                   );
                 }
               } catch (e) {
-                print('❌ 방 초대 알림 파싱 오류: $e');
+                print('❌ 방 알림 파싱 오류: $e');
+                print('📋 받은 데이터: ${frame.body}');
               }
             },
           );
@@ -554,7 +578,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                     padding: const EdgeInsets.all(16),
                     child: TextField(
                       decoration: const InputDecoration(
-                        hintText: "비공개 방 이름 검색",
+                        hintText: "1대1 채팅방 이름 검색",
                         prefixIcon: Icon(Icons.search),
                         border: OutlineInputBorder(),
                       ),
@@ -574,13 +598,13 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                     size: 64, color: Colors.grey),
                                 SizedBox(height: 16),
                                 Text(
-                                  "비공개 채팅방이 없습니다",
+                                  "1대1 채팅방이 없습니다",
                                   style: TextStyle(
                                       fontSize: 16, color: Colors.grey),
                                 ),
                                 SizedBox(height: 8),
                                 Text(
-                                  "우상단 + 버튼으로 새 비공개 방을 만들어보세요",
+                                  "우상단 + 버튼으로 새 1대1 채팅방을 만들어보세요",
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
@@ -626,53 +650,58 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.delete,
-                                            color: Colors.red),
-                                        onPressed: () async {
-                                          final confirm = await showDialog(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: const Text("비공개 방 삭제"),
-                                              content: Text(
-                                                  "'$displayName' 방을 정말 삭제하시겠습니까?"),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(ctx, false),
-                                                  child: const Text("취소"),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(ctx, true),
-                                                  child: const Text("삭제"),
-                                                ),
-                                              ],
-                                            ),
-                                          );
+                                      if (room.createId == userId ||
+                                          role == "ROLE_MASTER")
+                                        IconButton(
+                                          icon: const Icon(Icons.delete,
+                                              color: Colors.red),
+                                          onPressed: () async {
+                                            final confirm = await showDialog(
+                                              context: context,
+                                              builder: (ctx) => AlertDialog(
+                                                title: const Text("1대1 채팅방 삭제"),
+                                                content: Text(
+                                                    "'$displayName' 방을 정말 삭제하시겠습니까?"),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                            ctx, false),
+                                                    child: const Text("취소"),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                            ctx, true),
+                                                    child: const Text("삭제"),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
 
-                                          if (confirm == true) {
-                                            try {
-                                              await ChatApiService
-                                                  .privatedeleteRoom(room.id);
-                                              _fetchPrivateRooms();
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                    content:
-                                                        Text("비공개 방이 삭제되었습니다")),
-                                              );
-                                            } catch (e) {
-                                              print('❌ 방 삭제 오류: $e');
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                SnackBar(
-                                                    content: Text('삭제 실패: $e')),
-                                              );
+                                            if (confirm == true) {
+                                              try {
+                                                await ChatApiService
+                                                    .privatedeleteRoom(room.id);
+                                                _fetchPrivateRooms();
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                      content: Text(
+                                                          "1대1 채팅방이 삭제되었습니다")),
+                                                );
+                                              } catch (e) {
+                                                print('❌ 방 삭제 오류: $e');
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content:
+                                                          Text('삭제 실패: $e')),
+                                                );
+                                              }
                                             }
-                                          }
-                                        },
-                                      ),
+                                          },
+                                        ),
                                     ],
                                   ),
                                 ),
