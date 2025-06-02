@@ -137,7 +137,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://1970-118-131-64-204.ngrok-free.app/ws-chat',
+        url: 'https://f4ab-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           // 🔥 각 방에 대한 참여자 수 구독

@@ -32,6 +32,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   String role = '';
   String userId = '';
   late StompClient roomInviteClient; // 방 초대 알림용 클라이언트
+  bool _isInviteClientConnected = false; // 🚀 연결 상태 추가
 
   @override
   void initState() {
@@ -50,8 +51,13 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   }
 
   // 개인 채팅방 초대 알림 구독
-  // 개인 채팅방 초대 알림 구독
   void _subscribeToRoomInvitations() async {
+    // 🚀 이미 연결되어 있으면 중복 연결 방지
+    if (_isInviteClientConnected) {
+      print('⚠️ 이미 초대 알림 클라이언트가 연결되어 있습니다');
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final currentUserId = prefs.getString('userId') ?? '';
 
@@ -59,15 +65,19 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
     roomInviteClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://1970-118-131-64-204.ngrok-free.app/ws-chat',
+        url: 'https://f4ab-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           print('✅ 방 초대 알림 WebSocket 연결됨');
+          _isInviteClientConnected = true; // 🚀 연결 상태 업데이트
 
           // 나에게 온 초대 알림 구독
           roomInviteClient.subscribe(
             destination: '/sub/private-room/invite/$currentUserId',
             callback: (frame) {
               print('📨 개인 채팅방 알림: ${frame.body}');
+
+              // 🚀 위젯이 마운트되어 있을 때만 처리
+              if (!mounted) return;
 
               try {
                 // JSON 파싱 - 한 번만!
@@ -88,14 +98,12 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                   });
 
                   // 삭제 알림 표시
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('채팅방이 삭제되었습니다'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('채팅방이 삭제되었습니다'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
 
                   return; // ⭐️ 중요! 여기서 함수 종료
                 }
@@ -134,7 +142,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                 });
 
                 // 알림 표시 (본인이 만든 방은 알림 표시 안 함)
-                if (mounted && newRoom.createId != currentUserId) {
+                if (newRoom.createId != currentUserId) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
@@ -167,7 +175,14 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
             },
           );
         },
-        onWebSocketError: (error) => print('❌ 방 초대 알림 WebSocket 오류: $error'),
+        onDisconnect: (frame) {
+          print('❌ 방 초대 알림 WebSocket 연결 해제됨');
+          _isInviteClientConnected = false; // 🚀 연결 상태 업데이트
+        },
+        onWebSocketError: (error) {
+          print('❌ 방 초대 알림 WebSocket 오류: $error');
+          _isInviteClientConnected = false; // 🚀 연결 상태 업데이트
+        },
       ),
     );
     roomInviteClient.activate();
@@ -523,7 +538,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://1970-118-131-64-204.ngrok-free.app/ws-chat',
+        url: 'https://f4ab-118-131-64-204.ngrok-free.app/ws-chat',
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           for (var room in allRooms) {
@@ -712,10 +727,14 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
   @override
   void dispose() {
-    // STOMP 클라이언트 정리
+    // 🚀 정리 순서 개선
+    _isInviteClientConnected = false;
+
     if (isStompConnected) {
       stompClient.deactivate();
+      isStompConnected = false;
     }
+
     roomInviteClient.deactivate();
     super.dispose();
   }
