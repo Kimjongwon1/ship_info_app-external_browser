@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-
+import 'package:chat_config/chat_config.dart';
 import '../../widget/button.dart';
 import '../../widget/input_field.dart';
 import '../../widget/toast.dart';
@@ -58,8 +58,7 @@ class RegisterPage extends ConsumerWidget {
                 print("📡 요청 보냄");
 
                 final response = await http.post(
-                  Uri.parse(
-                      'https://f4ab-118-131-64-204.ngrok-free.app/api/register'),
+                  Uri.parse('${ApiConfig.activeBaseUrl}/api/register'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({'username': id, 'password': pw}),
                 );

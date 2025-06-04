@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:CHAT_SHIRE/app.dart';
+import 'package:chat_config/chat_config.dart';
 import 'package:CHAT_SHIRE/model/private_chat_room.dart';
 import 'package:CHAT_SHIRE/model/user.dart';
 import 'package:CHAT_SHIRE/util/route_path.dart';
@@ -11,11 +12,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../model/chat_room.dart';
 
 class ChatApiService {
-  static const String baseUrl =
-      'https://f4ab-118-131-64-204.ngrok-free.app/api/chat';
-  static const String roomBaseUrl =
-      'https://f4ab-118-131-64-204.ngrok-free.app/api/room';
-
   // 🚀 JWT 만료 처리 중복 방지
   static bool _isHandlingJWTExpired = false;
 
@@ -35,15 +31,16 @@ class ChatApiService {
 
   // 🚀 JWT 만료 체크 및 자동 로그아웃 처리 (중복 방지)
   static Future<void> _handleUnauthorized(http.Response response) async {
-    if ((response.statusCode == 401 || response.statusCode == 403) && !_isHandlingJWTExpired) {
+    if ((response.statusCode == 401 || response.statusCode == 403) &&
+        !_isHandlingJWTExpired) {
       _isHandlingJWTExpired = true; // 🚀 중복 처리 방지
-      
+
       print("🚫 JWT 만료 또는 인증 실패 → 자동 로그아웃");
-      
+
       // 토큰 삭제
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear(); // 또는 특정 키만: await prefs.remove('jwt');
-      
+
       // 로그인 페이지로 이동
       final context = MyApp.navigatorKey.currentContext;
       if (context != null) {
@@ -52,7 +49,7 @@ class ChatApiService {
           RoutePath.login,
           (route) => false,
         );
-        
+
         // 사용자에게 알림 (한 번만)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -62,12 +59,12 @@ class ChatApiService {
           ),
         );
       }
-      
+
       // 잠시 후 플래그 리셋 (새로운 세션을 위해)
       Future.delayed(const Duration(seconds: 5), () {
         _isHandlingJWTExpired = false;
       });
-      
+
       throw Exception('JWT expired - redirected to login');
     }
   }
@@ -75,21 +72,20 @@ class ChatApiService {
   // 🚀 에러 메시지에서 JWT 만료 체크 (중복 방지)
   static Future<void> _checkJWTExpiredInError(dynamic error) async {
     if (_isHandlingJWTExpired) return; // 🚀 이미 처리 중이면 무시
-    
+
     final errorString = error.toString();
-    
-    if (errorString.contains('JWT expired') || 
+
+    if (errorString.contains('JWT expired') ||
         errorString.contains('JWT malformed') ||
         errorString.contains('Unauthorized')) {
-      
       _isHandlingJWTExpired = true; // 🚀 중복 처리 방지
-      
+
       print("❌ JWT 만료 감지: $errorString");
-      
+
       // 토큰 삭제
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-      
+
       // 로그인 페이지로 이동
       final context = MyApp.navigatorKey.currentContext;
       if (context != null) {
@@ -98,7 +94,7 @@ class ChatApiService {
           RoutePath.login,
           (route) => false,
         );
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('로그인이 만료되었습니다. 다시 로그인해주세요.'),
@@ -107,7 +103,7 @@ class ChatApiService {
           ),
         );
       }
-      
+
       // 잠시 후 플래그 리셋
       Future.delayed(const Duration(seconds: 5), () {
         _isHandlingJWTExpired = false;
@@ -118,16 +114,17 @@ class ChatApiService {
   static Future<List<ChatRoom>> fetchRoomList() async {
     try {
       final headers = await _authHeaders();
-      final response =
-          await http.get(Uri.parse('$roomBaseUrl/list'), headers: headers);
+      final response = await http.get(Uri.parse(ApiConfig.getRoomListUrl()),
+          headers: headers); // 🚀 전역 설정!
       // print("📦 요청 헤더: $headers");
       // print("🌐 상태코드: ${response.statusCode}");
       print("📄 응답본문: ${response.body}");
-      
+
       // 🚀 JWT 만료 체크 (기존 코드 유지 + 중복 방지)
-      if ((response.statusCode == 401 || response.statusCode == 403) && !_isHandlingJWTExpired) {
+      if ((response.statusCode == 401 || response.statusCode == 403) &&
+          !_isHandlingJWTExpired) {
         _isHandlingJWTExpired = true;
-        
+
         print("🚫 인증 실패 → 로그인으로 이동");
         final prefs = await SharedPreferences.getInstance();
         await prefs.clear();
@@ -139,7 +136,7 @@ class ChatApiService {
             RoutePath.login,
             (route) => false,
           );
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('로그인이 만료되었습니다. 다시 로그인해주세요.'),
@@ -148,14 +145,14 @@ class ChatApiService {
             ),
           );
         }
-        
+
         Future.delayed(const Duration(seconds: 5), () {
           _isHandlingJWTExpired = false;
         });
-        
+
         throw Exception('unauthorized');
       }
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
         return data.map((e) => ChatRoom.fromJson(e)).toList();
@@ -172,8 +169,9 @@ class ChatApiService {
   static Future<List<Map<String, dynamic>>> fetchChatHistory() async {
     try {
       final headers = await _authHeaders();
-      final response =
-          await http.get(Uri.parse('$baseUrl/history'), headers: headers);
+      final response = await http.get(
+          Uri.parse('${ApiConfig.chatBaseUrl}/history'),
+          headers: headers); // 🚀 전역 설정!
 
       await _handleUnauthorized(response);
 
@@ -193,11 +191,12 @@ class ChatApiService {
       String roomId) async {
     try {
       final headers = await _authHeaders();
-      final response =
-          await http.get(Uri.parse('$baseUrl/history/$roomId'), headers: headers);
-      
+      final response = await http.get(
+          Uri.parse(ApiConfig.getChatHistoryUrl(roomId)),
+          headers: headers); // 🚀 전역 설정!
+
       await _handleUnauthorized(response);
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
         return data.cast<Map<String, dynamic>>();
@@ -213,7 +212,8 @@ class ChatApiService {
   static Future<int> fetchParticipantCount(String roomId) async {
     try {
       final headers = await _authHeaders();
-      final url = Uri.parse('$baseUrl/room/$roomId/count');
+      final url =
+          Uri.parse('${ApiConfig.chatBaseUrl}/room/$roomId/count'); // 🚀 전역 설정!
       final response = await http.get(url, headers: headers);
 
       await _handleUnauthorized(response);
@@ -233,7 +233,7 @@ class ChatApiService {
       String name, String password, String createId) async {
     try {
       final headers = await _authHeaders();
-      final url = Uri.parse('$roomBaseUrl/create');
+      final url = Uri.parse(ApiConfig.getCreateRoomUrl()); // 🚀 전역 설정!
       print('🔍 방 생성 요청2 - createId: $createId');
       final response = await http.post(
         url,
@@ -256,7 +256,7 @@ class ChatApiService {
   static Future<void> deleteRoom(int roomId) async {
     try {
       final headers = await _authHeaders();
-      final url = Uri.parse('$roomBaseUrl/delete/$roomId');
+      final url = Uri.parse(ApiConfig.getDeleteRoomUrl(roomId)); // 🚀 전역 설정!
       final response = await http.delete(url, headers: headers);
 
       await _handleUnauthorized(response);
@@ -273,7 +273,8 @@ class ChatApiService {
   static Future<void> privatedeleteRoom(int roomId) async {
     try {
       final headers = await _authHeaders();
-      final url = Uri.parse('$roomBaseUrl/private/delete/$roomId');
+      final url =
+          Uri.parse(ApiConfig.getPrivateDeleteRoomUrl(roomId)); // 🚀 전역 설정!
       final response = await http.delete(url, headers: headers);
 
       await _handleUnauthorized(response);
@@ -292,8 +293,9 @@ class ChatApiService {
     try {
       final headers = await _authHeaders();
 
-      final response = await http
-          .get(Uri.parse('$baseUrl/history/private/$roomId'), headers: headers);
+      final response = await http.get(
+          Uri.parse(ApiConfig.getPrivateChatHistoryUrl(roomId)),
+          headers: headers); // 🚀 전역 설정!
 
       await _handleUnauthorized(response);
 
@@ -314,14 +316,14 @@ class ChatApiService {
   static Future<int> fetchParticipantCountDirect(String roomId) async {
     try {
       final headers = await _authHeaders();
-      final url = Uri.parse(
-          'https://f4ab-118-131-64-204.ngrok-free.app/api/chat/participants/count?roomId=$roomId');
+      final url =
+          Uri.parse(ApiConfig.getParticipantCountUrl(roomId)); // 🚀 전역 설정!
       final response = await http.get(url, headers: headers);
 
       await _handleUnauthorized(response);
 
       if (response.statusCode == 200) {
-        debugPrint("❌ 서버 응답코드: ${response.statusCode}, 응답본문: ${response.body}");
+        debugPrint("✅ 서버 응답코드: ${response.statusCode}, 응답본문: ${response.body}");
         return int.parse(response.body);
       } else {
         debugPrint("❌ 서버 응답코드: ${response.statusCode}, 응답본문: ${response.body}");
@@ -338,8 +340,7 @@ class ChatApiService {
     try {
       final headers = await _authHeaders();
       final response = await http.post(
-        Uri.parse(
-            'https://f4ab-118-131-64-204.ngrok-free.app/api/room/private/create'),
+        Uri.parse(ApiConfig.getCreatePrivateRoomUrl()), // 🚀 전역 설정!
         headers: headers,
         body: jsonEncode({
           'name': name,
@@ -371,8 +372,7 @@ class ChatApiService {
       print('🧪 userId: $userId');
 
       final response = await http.get(
-        Uri.parse(
-            'https://f4ab-118-131-64-204.ngrok-free.app/api/room/myprivateroom/list?userId=$userId'),
+        Uri.parse(ApiConfig.getPrivateRoomListUrl(userId)), // 🚀 전역 설정!
         headers: headers,
       );
 
@@ -393,8 +393,8 @@ class ChatApiService {
   static Future<List<User>> fetchAllUsers() async {
     try {
       final headers = await _authHeaders();
-      final response =
-          await http.get(Uri.parse('$roomBaseUrl/users'), headers: headers);
+      final response = await http.get(Uri.parse(ApiConfig.getUsersUrl()),
+          headers: headers); // 🚀 전역 설정!
 
       await _handleUnauthorized(response);
 

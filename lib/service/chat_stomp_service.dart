@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:chat_config/chat_config.dart';
 import 'package:flutter/material.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
@@ -24,7 +25,7 @@ void connectStomp(
 
   stompClient = StompClient(
     config: StompConfig.SockJS(
-      url: 'https://f4ab-118-131-64-204.ngrok-free.app/ws-chat',
+      url: ApiConfig.wsUrl, // 🚀 전역 설정 사용!
       onConnect: (StompFrame frame) {
         isStompConnected = true;
         print("📡 STOMP 연결됨 → 구독 주소: $destination");

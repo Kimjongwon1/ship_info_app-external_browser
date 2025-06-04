@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
-
+import 'package:chat_config/chat_config.dart';
 import '../service/chat_api_service.dart';
 import '../service/chat_stomp_service.dart';
 import 'chat_page.dart';
@@ -137,7 +137,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://f4ab-118-131-64-204.ngrok-free.app/ws-chat',
+        url: ApiConfig.wsUrl,
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           // 🔥 각 방에 대한 참여자 수 구독

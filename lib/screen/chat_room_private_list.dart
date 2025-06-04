@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
-
+import 'package:chat_config/chat_config.dart';
 import '../service/chat_api_service.dart';
 import '../service/chat_stomp_service.dart';
 import 'chat_page.dart';
@@ -65,7 +65,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
     roomInviteClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://f4ab-118-131-64-204.ngrok-free.app/ws-chat',
+        url:ApiConfig.wsUrl,
         onConnect: (StompFrame frame) {
           print('✅ 방 초대 알림 WebSocket 연결됨');
           _isInviteClientConnected = true; // 🚀 연결 상태 업데이트
@@ -538,7 +538,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       Function(String roomId, int count) onParticipantUpdate) {
     stompClient = StompClient(
       config: StompConfig.SockJS(
-        url: 'https://f4ab-118-131-64-204.ngrok-free.app/ws-chat',
+        url: ApiConfig.wsUrl,
         onConnect: (StompFrame frame) {
           isStompConnected = true;
           for (var room in allRooms) {

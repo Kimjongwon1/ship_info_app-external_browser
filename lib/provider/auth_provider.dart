@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:chat_config/chat_config.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,7 +16,7 @@ class AuthNotifier extends StateNotifier<bool> {
     try {
       // 🔍 요청할 username 확인
       final response = await http.post(
-        Uri.parse('https://f4ab-118-131-64-204.ngrok-free.app/api/login'),
+        Uri.parse('${ApiConfig.activeBaseUrl}/api/login'), // 🚀 전역 설정 사용!
         headers: {
           'Content-Type': 'application/json; charset=utf-8', // 🔧 charset 추가
           'Accept-Charset': 'utf-8', // 🔧 응답 charset 명시
