@@ -19,10 +19,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_inappwebview: ^6.0.0
   url_launcher: ^6.2.5
-  chat_config:
-    git:
-      url: https://github.com/Kimjongwon1/chat-config.git
-      ref: main
+  
 
 dev_dependencies:
   flutter_test:

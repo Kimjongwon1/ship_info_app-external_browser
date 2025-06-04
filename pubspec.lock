@@ -130,7 +130,7 @@ packages:
     source: hosted
     version: "1.3.0"
   chat_config:
-    dependency: "direct main"
+    dependency: "direct overridden"
     description:
       path: "."
       ref: main
