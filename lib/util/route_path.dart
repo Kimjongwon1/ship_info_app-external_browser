@@ -1,0 +1,47 @@
+import 'package:CHAT_SHIRE/screen/chat_room_private_list.dart';
+import 'package:flutter/material.dart';
+import 'package:CHAT_SHIRE/screen/auth/login_page.dart';
+import 'package:CHAT_SHIRE/screen/chat_room_create_page.dart';
+import 'package:CHAT_SHIRE/screen/chat_room_list_page.dart';
+
+import '../screen/chat_page.dart';
+import '../screen/ship_list_page.dart';
+
+class RoutePath {
+  static const String shipList = '/ship-list';
+  static const String chat = '/chat';
+  static const String login = '/login';
+
+  static Route<dynamic> onGenerateRoute(RouteSettings settings) {
+    switch (settings.name) {
+      case login:
+        return MaterialPageRoute(builder: (_) => const LoginPage());
+      case shipList:
+        return MaterialPageRoute(builder: (_) => const ShipListPage());
+      case chat:
+        final args = settings.arguments;
+        if (args is Map<String, dynamic> && args['roomId'] != null) {
+          final roomId = args['roomId'] as String;
+          return MaterialPageRoute(
+            builder: (_) =>
+                ChatPage(roomId: roomId, roomName: args['roomName'] ?? '채팅방'),
+          );
+        } else {
+          // 방 번호 없이 접근한 경우 에러 처리
+          return MaterialPageRoute(
+            builder: (_) => const Scaffold(
+              body: Center(child: Text('❌ 채팅방이없습니다')),
+            ),
+          );
+        }
+      case '/chat-rooms':
+        return MaterialPageRoute(builder: (_) => const ChatRoomListPage());
+      case '/create-room':
+        return MaterialPageRoute(builder: (_) => const ChatRoomCreatePage());
+      case '/private-chat-rooms':
+       return MaterialPageRoute(builder: (_) => const ChatRoomPrivateListPage());
+      default:
+        return MaterialPageRoute(builder: (_) => const ShipListPage());
+    }
+  }
+}

@@ -32,6 +32,10 @@ class ShipListNotifier extends StateNotifier<ShipListState> {
     return await ShipService.fetchAll(regionText);
   }
 
+  Future<List<Ship>> fetchOnlyDirectWithMain(String subArea, String mainArea) {
+    return ShipService.fetchAllWithMain(mainArea, subArea);
+  }
+
   Future<String?> getAreaMainTitle(String regionText) async {
     try {
       return await ShipService.getMainTitleFromSubArea(regionText);
@@ -61,7 +65,16 @@ class ShipListNotifier extends StateNotifier<ShipListState> {
   }
 
   void reset() {
-    state = ShipListState.initial();
+    state = state.copyWith(ships: [], isLoading: false);
+  }
+
+  Future<List<String>> getAllMainAreas() async {
+    try {
+      final res = await ShipService.getAllMainAreaTitles();
+      return res;
+    } catch (_) {
+      return [];
+    }
   }
 }
 

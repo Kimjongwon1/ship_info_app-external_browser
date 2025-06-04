@@ -2,7 +2,7 @@
 <uses-permission android:name="android.permission.INTERNET"/>
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <application
-        android:label="ship_info_app"
+        android:label="CHAT_SHIRE"
         android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher">
         <activity
