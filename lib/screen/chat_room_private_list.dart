@@ -1,14 +1,16 @@
-import 'dart:convert'; // JSON 파싱을 위해 추가
+import 'dart:convert';
 
 import 'package:CHAT_SHIRE/model/private_chat_room.dart';
 import 'package:CHAT_SHIRE/model/user.dart';
+import 'package:CHAT_SHIRE/service/unread_message_manager.dart';
 import 'package:CHAT_SHIRE/util/route_path.dart';
+import 'package:chat_config/chat_config.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
-import 'package:chat_config/chat_config.dart';
+
 import '../service/chat_api_service.dart';
 import '../service/chat_stomp_service.dart';
 import 'chat_page.dart';
@@ -24,22 +26,25 @@ class ChatRoomPrivateListPage extends StatefulWidget {
 class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   List<PrivateChatRoom> allRooms = [];
   List<PrivateChatRoom> filteredRooms = [];
-  Map<String, String> roomDisplayNames = {}; // roomId -> displayName 매핑
-
+  Map<String, String> roomDisplayNames = {};
   Map<String, int> participantCache = {};
+  Map<String, int> unreadCounts = {}; // 🔥 안읽은 메시지 개수 저장
+  Map<String, String> lastMessages = {}; // 🔥 마지막 메시지 저장
+  Map<String, String> lastMessageTimes = {}; // 🔥 마지막 메시지 시간 저장
+
   bool isLoading = true;
   String searchKeyword = "";
   String role = '';
   String userId = '';
-  late StompClient roomInviteClient; // 방 초대 알림용 클라이언트
-  bool _isInviteClientConnected = false; // 🚀 연결 상태 추가
+  late StompClient roomInviteClient;
+  bool _isInviteClientConnected = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _fetchPrivateRooms();
-    _subscribeToRoomInvitations(); // 초대 알림 구독 추가
+    _subscribeToRoomInvitations();
   }
 
   Future<void> _loadUserData() async {
@@ -50,9 +55,38 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
     });
   }
 
-  // 개인 채팅방 초대 알림 구독
+  // 🔥 안읽은 메시지 개수 및 마지막 메시지 로드
+  Future<void> _loadUnreadCounts() async {
+    if (allRooms.isEmpty) return;
+
+    for (var room in allRooms) {
+      final roomId = room.id.toString();
+
+      try {
+        // 안읽은 메시지 개수 조회
+        final unreadCount =
+            await UnreadMessageManager.getPrivateUnreadCount(roomId);
+
+        // 마지막 메시지 정보 조회
+        final lastMessageData =
+            await UnreadMessageManager.getPrivateLastMessage(roomId);
+
+        setState(() {
+          unreadCounts[roomId] = unreadCount;
+          if (lastMessageData != null) {
+            lastMessages[roomId] = UnreadMessageManager.cleanMessageText(
+                lastMessageData['message'] ?? '');
+            lastMessageTimes[roomId] =
+                UnreadMessageManager.formatTime(lastMessageData['timestamp']);
+          }
+        });
+      } catch (e) {
+        print('❌ 방 $roomId 안읽은 메시지 로드 실패: $e');
+      }
+    }
+  }
+
   void _subscribeToRoomInvitations() async {
-    // 🚀 이미 연결되어 있으면 중복 연결 방지
     if (_isInviteClientConnected) {
       print('⚠️ 이미 초대 알림 클라이언트가 연결되어 있습니다');
       return;
@@ -65,10 +99,10 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
     roomInviteClient = StompClient(
       config: StompConfig.SockJS(
-        url:ApiConfig.wsUrl,
+        url: ApiConfig.wsUrl,
         onConnect: (StompFrame frame) {
           print('✅ 방 초대 알림 WebSocket 연결됨');
-          _isInviteClientConnected = true; // 🚀 연결 상태 업데이트
+          _isInviteClientConnected = true;
 
           // 나에게 온 초대 알림 구독
           roomInviteClient.subscribe(
@@ -76,15 +110,12 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
             callback: (frame) {
               print('📨 개인 채팅방 알림: ${frame.body}');
 
-              // 🚀 위젯이 마운트되어 있을 때만 처리
               if (!mounted) return;
 
               try {
-                // JSON 파싱 - 한 번만!
                 final Map<String, dynamic> data =
                     jsonDecode(frame.body ?? '{}');
 
-                // ✅ 삭제 알림인 경우
                 if (data['action'] == 'delete') {
                   final deletedRoomId = data['roomId'].toString();
                   print('🗑 삭제 알림 수신 → roomId: $deletedRoomId');
@@ -95,23 +126,23 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                     filteredRooms.removeWhere(
                         (room) => room.id.toString() == deletedRoomId);
                     roomDisplayNames.remove(deletedRoomId);
+                    // 🔥 안읽은 메시지 관련 데이터도 삭제
+                    unreadCounts.remove(deletedRoomId);
+                    lastMessages.remove(deletedRoomId);
+                    lastMessageTimes.remove(deletedRoomId);
                   });
 
-                  // 삭제 알림 표시
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('채팅방이 삭제되었습니다'),
                       duration: Duration(seconds: 2),
                     ),
                   );
-
-                  return; // ⭐️ 중요! 여기서 함수 종료
+                  return;
                 }
 
-                // ✅ 방 생성 알림 처리 (삭제가 아닌 경우에만 실행됨)
                 print('🏠 방 생성 알림 처리');
 
-                // null 체크 추가
                 if (data['id'] == null) {
                   print('❌ 방 ID가 null입니다');
                   return;
@@ -127,21 +158,19 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                   inviteId: data['inviteId'] ?? '',
                 );
 
-                // 실시간으로 방 목록에 추가
                 setState(() {
-                  // 중복 체크
                   if (!allRooms.any((room) => room.id == newRoom.id)) {
                     allRooms.add(newRoom);
-
-                    // 표시 이름 설정
                     _updateRoomDisplayName(newRoom);
-
-                    // 필터 재적용
+                    // 🔥 새 방의 안읽은 메시지 초기화
+                    final roomId = newRoom.id.toString();
+                    unreadCounts[roomId] = 0;
+                    lastMessages[roomId] = '';
+                    lastMessageTimes[roomId] = '';
                     _applyFilter();
                   }
                 });
 
-                // 알림 표시 (본인이 만든 방은 알림 표시 안 함)
                 if (newRoom.createId != currentUserId) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -174,26 +203,64 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
               }
             },
           );
+
+          // 🔥 실시간 메시지 알림 구독 추가
+          for (var room in allRooms) {
+            final roomId = room.id.toString();
+            roomInviteClient.subscribe(
+              destination: '/sub/chat/private/$roomId',
+              callback: (frame) {
+                if (!mounted) return;
+
+                try {
+                  final messageData = jsonDecode(frame.body ?? '{}');
+                  // ✅ 여러 필드명 확인 및 디버깅 추가
+                  final sender =
+                      messageData['sender'] ?? messageData['senderId'] ?? '';
+
+                  print('🔍 실시간 메시지 수신 - 방: $roomId');
+                  print('📤 보낸이: $sender, 현재유저: $userId');
+                  print('📋 메시지 데이터: $messageData');
+
+                  // 내가 보낸 메시지가 아닌 경우에만 안읽은 개수 증가
+                  if (sender.isNotEmpty && sender != userId) {
+                    setState(() {
+                      unreadCounts[roomId] = (unreadCounts[roomId] ?? 0) + 1;
+                      lastMessages[roomId] =
+                          UnreadMessageManager.cleanMessageText(
+                              messageData['message'] ?? '');
+                      lastMessageTimes[roomId] =
+                          UnreadMessageManager.formatTime(
+                              messageData['timestamp']);
+                    });
+                    print('📈 안읽은 메시지 증가: ${unreadCounts[roomId]}');
+                  } else {
+                    print('🚫 내가 보낸 메시지이므로 안읽은 개수 증가하지 않음');
+                  }
+                } catch (e) {
+                  print('❌ 실시간 메시지 처리 오류: $e');
+                }
+              },
+            );
+          }
         },
         onDisconnect: (frame) {
           print('❌ 방 초대 알림 WebSocket 연결 해제됨');
-          _isInviteClientConnected = false; // 🚀 연결 상태 업데이트
+          _isInviteClientConnected = false;
         },
         onWebSocketError: (error) {
           print('❌ 방 초대 알림 WebSocket 오류: $error');
-          _isInviteClientConnected = false; // 🚀 연결 상태 업데이트
+          _isInviteClientConnected = false;
         },
       ),
     );
     roomInviteClient.activate();
   }
 
-  // 단일 방의 표시 이름 업데이트
   void _updateRoomDisplayName(PrivateChatRoom room) async {
     if (room.createId == userId && room.inviteId == userId) {
       roomDisplayNames[room.id.toString()] = "나와의 채팅";
     } else if (room.inviteId == userId) {
-      // 초대한 사람의 이름 가져오기
       try {
         final users = await ChatApiService.fetchAllUsers();
         final creator = users.firstWhere((user) => user.id == room.createId,
@@ -218,22 +285,17 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
           .where((room) => room.createId == userId || room.inviteId == userId)
           .toList();
 
-      // 모든 유저 정보를 가져와서 이름을 매핑
       final users = await ChatApiService.fetchAllUsers();
       final userMap = {for (var user in users) user.id: user.name};
 
-      // 각 방에 대해 표시할 이름을 설정
       roomDisplayNames.clear();
       for (var room in visibleRooms) {
         if (room.createId == userId && room.inviteId == userId) {
-          // 생성자와 초대자가 모두 나인 경우: 나와의 채팅
           roomDisplayNames[room.id.toString()] = "나와의 채팅";
         } else if (room.inviteId == userId) {
-          // 내가 초대받은 경우: 방을 만든 사람의 이름을 표시
           final creatorName = userMap[room.createId] ?? room.createId;
           roomDisplayNames[room.id.toString()] = "$creatorName님과의 1대1 채팅방";
         } else {
-          // 내가 만든 경우: 기존 방 이름 유지
           roomDisplayNames[room.id.toString()] = room.name;
         }
       }
@@ -242,6 +304,9 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
         allRooms = visibleRooms;
         _applyFilter();
       });
+
+      // 🔥 안읽은 메시지 개수 로드
+      await _loadUnreadCounts();
 
       connectStompForRoomList((roomId, count) {
         setState(() {
@@ -413,19 +478,16 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   }
 
   void _showCreatePrivateRoomDialog(User inviteUser) {
-    // 먼저 해당 유저와의 채팅방이 이미 있는지 확인
     PrivateChatRoom? existingRoom;
     try {
       existingRoom = allRooms.firstWhere((room) =>
           (room.createId == userId && room.inviteId == inviteUser.id) ||
           (room.createId == inviteUser.id && room.inviteId == userId));
     } catch (e) {
-      // 찾지 못한 경우 null로 유지
       existingRoom = null;
     }
 
     if (existingRoom != null) {
-      // 이미 채팅방이 있으면 안내하고 바로 입장 옵션 제공
       final displayName =
           roomDisplayNames[existingRoom.id.toString()] ?? existingRoom.name;
 
@@ -461,7 +523,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       return;
     }
 
-    // 기존 방이 없는 경우에만 새로 생성
     final nameController =
         TextEditingController(text: "${inviteUser.name}님과의 1대1 채팅방");
     final passwordController = TextEditingController();
@@ -577,7 +638,9 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
             ),
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: _fetchPrivateRooms,
+              onPressed: () {
+                _fetchPrivateRooms();
+              },
             ),
             IconButton(
               icon: const Icon(Icons.add),
@@ -636,83 +699,238 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                               final roomId = room.id.toString();
                               final displayName =
                                   roomDisplayNames[roomId] ?? room.name;
+                              final unreadCount = unreadCounts[roomId] ?? 0;
+                              final lastMessage = lastMessages[roomId] ?? '';
+                              final lastTime = lastMessageTimes[roomId] ?? '';
 
-                              return Card(
-                                elevation: 3,
-                                child: ListTile(
-                                  leading: const Icon(
-                                    Icons.lock,
-                                    color: Colors.red,
-                                    size: 28,
-                                  ),
-                                  title: Text(
-                                    displayName,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                  onTap: () async {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ChatPage(
-                                          roomId: room.id.toString(),
-                                          roomName: displayName,
-                                          isPrivate: true,
-                                        ),
+                              return GestureDetector(
+                                onTap: () async {
+                                  // 🔥 채팅방 입장 시 읽음 처리
+                                  await UnreadMessageManager.markAsRead(roomId);
+                                  setState(() {
+                                    unreadCounts[roomId] = 0;
+                                  });
+
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChatPage(
+                                        roomId: room.id.toString(),
+                                        roomName: displayName,
+                                        isPrivate: true,
                                       ),
-                                    );
-                                  },
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.delete,
-                                            color: Colors.red),
-                                        onPressed: () async {
-                                          final confirm = await showDialog(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: const Text("1대1 채팅방 삭제"),
-                                              content: Text(
-                                                  "'$displayName' 방을 정말 삭제하시겠습니까?"),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(ctx, false),
-                                                  child: const Text("취소"),
+                                    ),
+                                  ).then((_) {
+                                    _loadUnreadCounts();
+                                  });
+                                },
+                                child: Card(
+                                  elevation: 2,
+                                  margin:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // 🔥 메인 콘텐츠 영역 (이름 + 메시지)
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              // 채팅방 이름
+                                              Text(
+                                                displayName,
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: unreadCount > 0
+                                                      ? FontWeight.bold
+                                                      : FontWeight.w600,
+                                                  color: Colors.black87,
                                                 ),
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(ctx, true),
-                                                  child: const Text("삭제"),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+
+                                              // 마지막 메시지
+                                              if (lastMessage.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  lastMessage,
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    color: unreadCount > 0
+                                                        ? Colors.grey
+                                                            .shade700 // 안읽은 메시지가 있으면 조금 더 진하게
+                                                        : Colors.grey.shade500,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ],
-                                            ),
-                                          );
+                                            ],
+                                          ),
+                                        ),
 
-                                          if (confirm == true) {
-                                            try {
-                                              await ChatApiService
-                                                  .privatedeleteRoom(room.id);
-                                              _fetchPrivateRooms();
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                    content: Text(
-                                                        "1대1 채팅방이 삭제되었습니다")),
-                                              );
-                                            } catch (e) {
-                                              print('❌ 방 삭제 오류: $e');
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                SnackBar(
-                                                    content: Text('삭제 실패: $e')),
-                                              );
-                                            }
-                                          }
-                                        },
-                                      ),
-                                    ],
+                                        const SizedBox(width: 8),
+
+                                        // 🔥 오른쪽 영역 - 높이 증가로 오버플로우 해결
+                                        SizedBox(
+                                          height: 80, // 🔥 60px → 80px로 증가
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            mainAxisAlignment: MainAxisAlignment
+                                                .spaceBetween, // 🔥 공간 균등 분배
+                                            children: [
+                                              // 🔥 상단: 삭제 버튼
+                                              Align(
+                                                alignment: Alignment.topRight,
+                                                child: SizedBox(
+                                                  width: 24,
+                                                  height: 24,
+                                                  child: IconButton(
+                                                    padding: EdgeInsets.zero,
+                                                    constraints:
+                                                        const BoxConstraints(), // 🔥 제약 조건 제거
+                                                    icon: Icon(
+                                                      Icons.delete_outline,
+                                                      color:
+                                                          Colors.grey.shade400,
+                                                      size: 16,
+                                                    ),
+                                                    onPressed: () async {
+                                                      final confirm =
+                                                          await showDialog(
+                                                        context: context,
+                                                        builder: (ctx) =>
+                                                            AlertDialog(
+                                                          title: const Text(
+                                                              "채팅방 삭제"),
+                                                          content: Text(
+                                                              "'$displayName' 방을 삭제하시겠습니까?"),
+                                                          actions: [
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                      ctx,
+                                                                      false),
+                                                              child: const Text(
+                                                                  "취소"),
+                                                            ),
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                      ctx,
+                                                                      true),
+                                                              child: const Text(
+                                                                "삭제",
+                                                                style: TextStyle(
+                                                                    color: Colors
+                                                                        .red),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+
+                                                      if (confirm == true) {
+                                                        try {
+                                                          await ChatApiService
+                                                              .privatedeleteRoom(
+                                                                  room.id);
+                                                          _fetchPrivateRooms();
+                                                          ScaffoldMessenger.of(
+                                                                  context)
+                                                              .showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text(
+                                                                  "채팅방이 삭제되었습니다"),
+                                                            ),
+                                                          );
+                                                        } catch (e) {
+                                                          ScaffoldMessenger.of(
+                                                                  context)
+                                                              .showSnackBar(
+                                                            SnackBar(
+                                                                content: Text(
+                                                                    '삭제 실패: $e')),
+                                                          );
+                                                        }
+                                                      }
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+
+                                              // 🔥 하단: 시간 + 뱃지 그룹
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.end,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  // 시간
+                                                  if (lastTime.isNotEmpty)
+                                                    Text(
+                                                      lastTime,
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            11, // 🔥 크기 축소
+                                                        color: Colors
+                                                            .grey.shade500,
+                                                      ),
+                                                    ),
+
+                                                  // 뱃지
+                                                  if (unreadCount > 0) ...[
+                                                    const SizedBox(
+                                                        height: 3), // 🔥 간격 축소
+                                                    Container(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal:
+                                                              6, // 🔥 패딩 축소
+                                                          vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.red,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
+                                                      ),
+                                                      constraints:
+                                                          const BoxConstraints(
+                                                        minWidth:
+                                                            18, // 🔥 최소 크기 축소
+                                                        minHeight: 18,
+                                                      ),
+                                                      child: Text(
+                                                        unreadCount > 99
+                                                            ? '99+'
+                                                            : '$unreadCount',
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize:
+                                                              10, // 🔥 폰트 크기 축소
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
@@ -727,7 +945,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
   @override
   void dispose() {
-    // 🚀 정리 순서 개선
     _isInviteClientConnected = false;
 
     if (isStompConnected) {

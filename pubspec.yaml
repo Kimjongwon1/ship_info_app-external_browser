@@ -39,7 +39,7 @@ flutter:
 chat_config:
    git:
      url: https://github.com/Kimjongwon1/chat-config.git
-     ref: main
+     ref: HEAD
 flutter_native_splash:
   color: "#ffffff"
   image: assets/splash.png

@@ -15,6 +15,9 @@ class AuthNotifier extends StateNotifier<bool> {
   Future<bool> login(String username, String password) async {
     try {
       // 🔍 요청할 username 확인
+      print('🔗 Base URL: ${ApiConfig.activeBaseUrl}');
+      print('🔗 전체 URL: ${ApiConfig.activeBaseUrl}/api/login');
+      print('🔗 URL 길이: ${ApiConfig.activeBaseUrl.length}'); // 공백 확인용
       final response = await http.post(
         Uri.parse('${ApiConfig.activeBaseUrl}/api/login'), // 🚀 전역 설정 사용!
         headers: {

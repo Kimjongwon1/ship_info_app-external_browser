@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:CHAT_SHIRE/app.dart';
-import 'package:chat_config/chat_config.dart';
 import 'package:CHAT_SHIRE/model/private_chat_room.dart';
 import 'package:CHAT_SHIRE/model/user.dart';
 import 'package:CHAT_SHIRE/util/route_path.dart';
+import 'package:chat_config/chat_config.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -407,6 +407,166 @@ class ChatApiService {
     } catch (e) {
       await _checkJWTExpiredInError(e);
       rethrow;
+    }
+  }
+
+  static Future<int> getUnreadMessageCount(
+      String roomId, int lastReadTime) async {
+    try {
+      final headers = await _authHeaders();
+      final url = Uri.parse(
+          '${ApiConfig.chatBaseUrl}/unread/count?roomId=$roomId&lastReadTime=$lastReadTime');
+
+      final response = await http.get(url, headers: headers);
+      await _handleUnauthorized(response);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['count'] ?? 0;
+      } else {
+        print('❌ 안읽은 메시지 개수 조회 실패: ${response.statusCode}');
+        return 0;
+      }
+    } catch (e) {
+      await _checkJWTExpiredInError(e);
+      print('❌ 안읽은 메시지 개수 API 오류: $e');
+      return 0;
+    }
+  }
+
+  // 🔔 마지막 메시지 정보 조회
+  static Future<Map<String, dynamic>?> getLastMessage(String roomId) async {
+    try {
+      final headers = await _authHeaders();
+      final url =
+          Uri.parse('${ApiConfig.chatBaseUrl}/last-message?roomId=$roomId');
+
+      final response = await http.get(url, headers: headers);
+      await _handleUnauthorized(response);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        return data.isNotEmpty ? data : null;
+      } else {
+        print('❌ 마지막 메시지 조회 실패: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      await _checkJWTExpiredInError(e);
+      print('❌ 마지막 메시지 API 오류: $e');
+      return null;
+    }
+  }
+
+  // 🔔 읽음 처리 API (선택사항 - 서버에서 읽음 상태를 관리하는 경우)
+  static Future<bool> markAsRead(String roomId, String userId) async {
+    try {
+      final headers = await _authHeaders();
+      final url = Uri.parse('${ApiConfig.chatBaseUrl}/mark-as-read');
+
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode({
+          'roomId': roomId,
+          'userId': userId,
+        }),
+      );
+
+      await _handleUnauthorized(response);
+
+      if (response.statusCode == 200) {
+        print('✅ 읽음 처리 완료: 방 $roomId');
+        return true;
+      } else {
+        print('❌ 읽음 처리 실패: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      await _checkJWTExpiredInError(e);
+      print('❌ 읽음 처리 API 오류: $e');
+      return false;
+    }
+  }
+
+  // 🔔 특정 시간 이후의 안읽은 메시지 개수 (개인 채팅방용)
+  static Future<int> getPrivateUnreadMessageCount(
+      String roomId, int lastReadTime) async {
+    try {
+      final headers = await _authHeaders();
+      final url = Uri.parse(
+          '${ApiConfig.chatBaseUrl}/private/unread/count?roomId=$roomId&lastReadTime=$lastReadTime');
+
+      final response = await http.get(url, headers: headers);
+      await _handleUnauthorized(response);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['count'] ?? 0;
+      } else {
+        print('❌ 개인 채팅방 안읽은 메시지 개수 조회 실패: ${response.statusCode}');
+        return 0;
+      }
+    } catch (e) {
+      await _checkJWTExpiredInError(e);
+      print('❌ 개인 채팅방 안읽은 메시지 개수 API 오류: $e');
+      return 0;
+    }
+  }
+
+  // 🔔 개인 채팅방 마지막 메시지 조회
+  static Future<Map<String, dynamic>?> getPrivateLastMessage(
+      String roomId) async {
+    try {
+      final headers = await _authHeaders();
+      final url = Uri.parse(
+          '${ApiConfig.chatBaseUrl}/private/last-message?roomId=$roomId');
+
+      final response = await http.get(url, headers: headers);
+      await _handleUnauthorized(response);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        return data.isNotEmpty ? data : null;
+      } else {
+        print('❌ 개인 채팅방 마지막 메시지 조회 실패: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      await _checkJWTExpiredInError(e);
+      print('❌ 개인 채팅방 마지막 메시지 API 오류: $e');
+      return null;
+    }
+  }
+
+  // 🔔 전체 채팅방의 안읽은 메시지 요약 조회 (효율적인 배치 처리)
+  static Future<Map<String, int>> getBatchUnreadCounts(
+      List<String> roomIds) async {
+    try {
+      final headers = await _authHeaders();
+      final url = Uri.parse('${ApiConfig.chatBaseUrl}/unread/batch');
+
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode({
+          'roomIds': roomIds,
+        }),
+      );
+
+      await _handleUnauthorized(response);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Map<String, int>.from(data['unreadCounts'] ?? {});
+      } else {
+        print('❌ 배치 안읽은 메시지 개수 조회 실패: ${response.statusCode}');
+        return {};
+      }
+    } catch (e) {
+      await _checkJWTExpiredInError(e);
+      print('❌ 배치 안읽은 메시지 개수 API 오류: $e');
+      return {};
     }
   }
 }

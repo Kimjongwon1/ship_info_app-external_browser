@@ -95,7 +95,7 @@ class _ChatHeaderState extends State<ChatHeader> {
     if (widget.isPrivate) {
       return const Padding(
         padding: EdgeInsets.all(12),
-        child: Text("🔒 1:1 채팅방입니다", style: TextStyle(fontSize: 16)),
+        // child: Text("1:1 채팅방입니다", style: TextStyle(fontSize: 16)),
       );
     }
     return Padding(

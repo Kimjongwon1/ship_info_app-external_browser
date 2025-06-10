@@ -52,10 +52,11 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
           _sortMessages();
         });
 
+        // ✅ reverse ListView에서는 새 메시지가 맨 위에 추가되므로 스크롤 불필요
+        // 필요시에만 맨 위로 스크롤
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollController.hasClients) {
-            _scrollController
-                .jumpTo(_scrollController.position.maxScrollExtent);
+            _scrollController.jumpTo(0);
           }
         });
       },
@@ -78,7 +79,6 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
 
   void _sendJoinEvent() {
     if (stompClient.connected) {
-      // ✅ SharedPreferences에서 가져온 currentUser 그대로 사용
       sendJoinEvent(widget.roomId, currentUser);
       debugPrint("📥 join sent: $currentUser → ${widget.roomId}");
     }
@@ -94,24 +94,34 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
       _sortMessages();
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-      }
-    });
+    // ✅ reverse ListView는 자동으로 아래에서 시작하므로 스크롤 불필요
   }
 
   void _sortMessages() {
-    messages.sort((a, b) => DateTime.parse(a['timestamp'])
-        .compareTo(DateTime.parse(b['timestamp'])));
+    // ✅ reverse ListView를 위해 최신 메시지부터 정렬 (내림차순)
+    messages.sort((a, b) => DateTime.parse(b['timestamp'])
+        .compareTo(DateTime.parse(a['timestamp'])));
+  }
+
+  // ✅ 맨 아래로 확실히 이동하는 함수
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients && messages.isNotEmpty) {
+        // 여러 번 시도해서 확실히 맨 아래로 이동
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (_scrollController.hasClients) {
+            _scrollController
+                .jumpTo(_scrollController.position.maxScrollExtent);
+          }
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     if (stompClient.connected) {
-      // ✅ SharedPreferences에서 가져온 currentUser 그대로 사용
       sendLeaveEvent(widget.roomId, currentUser);
-      // debugPrint("📤 leave sent: $currentUser → ${widget.roomId}");
     }
 
     stompClient.deactivate();
@@ -127,6 +137,7 @@ class _ChatReceiverWidgetState extends State<ChatReceiverWidget> {
 
     return ListView.builder(
       controller: _scrollController,
+      reverse: true, // ✅ 리스트를 뒤집어서 최신 메시지가 아래에 오도록
       itemCount: messages.length,
       itemBuilder: (_, index) {
         final msg = messages[index];
