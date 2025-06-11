@@ -11,7 +11,6 @@ import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
 
 import '../service/chat_api_service.dart';
-import '../service/chat_stomp_service.dart';
 import 'chat_page.dart';
 
 class ChatRoomListPage extends StatefulWidget {
@@ -24,7 +23,6 @@ class ChatRoomListPage extends StatefulWidget {
 class _ChatRoomListPageState extends State<ChatRoomListPage> {
   List<ChatRoom> allRooms = [];
   List<ChatRoom> filteredRooms = [];
-  Map<String, int> participantCache = {};
   Map<String, int> unreadCounts = {}; // 🔥 안읽은 메시지 개수 저장
   Map<String, String> lastMessages = {}; // 🔥 마지막 메시지 저장
   Map<String, String> lastMessageTimes = {}; // 🔥 마지막 메시지 시간 저장
@@ -194,13 +192,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
         _subscribeToAllRoomMessages();
       }
 
-      _fetchParticipantsForRooms(rooms);
-
-      connectStompForRoomList((roomId, count) {
-        setState(() {
-          participantCache[roomId] = count;
-        });
-      });
+      // 🔥 인원수 관련 코드 제거 (connectStompForRoomList 제거)
     } catch (e) {
       print("❌ 채팅방 목록 오류: $e");
     } finally {
@@ -208,15 +200,8 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
     }
   }
 
-  Future<void> _fetchParticipantsForRooms(List<ChatRoom> rooms) async {
-    for (var room in rooms) {
-      final roomId = room.id.toString(); // 🔄 int → String
-      final count = await ChatApiService.fetchParticipantCount(roomId);
-      setState(() {
-        participantCache[roomId] = count;
-      });
-    }
-  }
+  // 🔥 참여자 수 관련 메서드 제거
+  // Future<void> _fetchParticipantsForRooms(List<ChatRoom> rooms) async {
 
   void _applyFilter() {
     setState(() {
@@ -275,32 +260,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
     );
   }
 
-  void connectStompForRoomList(
-      Function(String roomId, int count) onParticipantUpdate) {
-    stompClient = StompClient(
-      config: StompConfig.SockJS(
-        url: ApiConfig.wsUrl,
-        onConnect: (StompFrame frame) {
-          isStompConnected = true;
-          // 🔥 각 방에 대한 참여자 수 구독
-          for (var room in allRooms) {
-            final roomId = room.id.toString();
-            stompClient.subscribe(
-              destination: '/sub/chat/participants/$roomId',
-              callback: (frame) {
-                final count = int.tryParse(frame.body ?? '');
-                if (count != null) {
-                  onParticipantUpdate(roomId, count);
-                }
-              },
-            );
-          }
-        },
-        onWebSocketError: (error) => print('❌ WebSocket 오류: $error'),
-      ),
-    );
-    stompClient.activate();
-  }
+  // 🔥 참여자 수 관련 connectStompForRoomList 메서드 제거
 
   @override
   Widget build(BuildContext context) {
@@ -377,10 +337,6 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
                               final roomId =
                                   room.id.toString(); // int -> String 변환
                               final roomName = room.name;
-                              final count = participantCache[roomId];
-                              final countText = (count != null)
-                                  ? "👥 $count명 참여중"
-                                  : "참여자 수 로딩 중...";
 
                               // 🔥 안읽은 메시지 관련 데이터
                               final unreadCount = unreadCounts[roomId] ?? 0;
@@ -463,13 +419,8 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
                                         ),
                                     ],
                                   ),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (lastMessage.isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
+                                  subtitle: lastMessage.isNotEmpty
+                                      ? Text(
                                           lastMessage,
                                           style: TextStyle(
                                             fontSize: 14,
@@ -479,18 +430,8 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        countText,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                        )
+                                      : null, // 🔥 인원수 표시 제거
                                   onTap: () async {
                                     // 🔥 채팅방 입장 시 읽음 처리
                                     await UnreadMessageManager.markAsRead(
@@ -593,6 +534,7 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
                                       await _loadUnreadCounts();
                                     }
                                   },
+
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -646,11 +588,6 @@ class _ChatRoomListPageState extends State<ChatRoomListPage> {
   @override
   void dispose() {
     _isMessageClientConnected = false;
-
-    if (isStompConnected) {
-      stompClient.deactivate();
-      isStompConnected = false;
-    }
 
     if (_isMessageClientConnected) {
       messageClient.deactivate();
