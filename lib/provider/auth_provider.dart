@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:CHAT_SHIRE/service/unread_message_manager.dart';
 import 'package:chat_config/chat_config.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -10,7 +11,27 @@ final authProvider = StateNotifierProvider<AuthNotifier, bool>((ref) {
 });
 
 class AuthNotifier extends StateNotifier<bool> {
-  AuthNotifier() : super(false);
+  AuthNotifier() : super(false) {
+    // 🔥 앱 시작 시 저장된 사용자 ID 자동 로드
+    _loadCurrentUserId();
+  }
+
+  // 🔥 앱 시작 시 사용자 ID 로드
+  Future<void> _loadCurrentUserId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUserId = prefs.getString('userId');
+      if (savedUserId != null && savedUserId.isNotEmpty) {
+        UnreadMessageManager.setCurrentUserId(savedUserId);
+        print('✅ 앱 시작 시 사용자 ID 자동 로드: $savedUserId');
+
+        // 🔥 앱 시작 시 오래된 읽음 상태 정리 (30일 이상 된 데이터)
+        await UnreadMessageManager.cleanupOldReadStatus();
+      }
+    } catch (e) {
+      print('❌ 사용자 ID 자동 로드 실패: $e');
+    }
+  }
 
   Future<bool> login(String username, String password) async {
     try {
@@ -52,6 +73,13 @@ class AuthNotifier extends StateNotifier<bool> {
           // 🔧 UTF-8 처리된 username 저장
           await prefs.setString('username', responseUsername);
           await prefs.setString('userId', userId.toString());
+
+          // 🔥 UnreadMessageManager에 사용자 ID 설정
+          UnreadMessageManager.setCurrentUserId(userId.toString());
+
+          // 🔥 로그인 시 해당 사용자의 읽음 상태 초기화 (이전 로그인 데이터 문제 방지)
+          await UnreadMessageManager.clearUserReadStatus(userId.toString());
+          print('🔄 로그인 시 이전 읽음 상태 초기화 완료');
 
           if (role != null) {
             await prefs.setString('role', role);
@@ -98,6 +126,26 @@ class AuthNotifier extends StateNotifier<bool> {
       } else {
         throw Exception('예상치 못한 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
       }
+    }
+  }
+
+  // 🔥 로그아웃 시 읽음 상태 관리
+  Future<void> logout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // 🔥 현재 사용자의 읽음 상태 완전 삭제 (로그인 시 안읽음 문제 해결)
+      await UnreadMessageManager.clearCurrentUserReadStatus();
+
+      // 사용자 ID 클리어
+      UnreadMessageManager.setCurrentUserId('');
+
+      await prefs.clear();
+      state = false;
+
+      print('✅ 로그아웃 완료 - 읽음 상태도 초기화됨');
+    } catch (e) {
+      print('❌ 로그아웃 실패: $e');
     }
   }
 }

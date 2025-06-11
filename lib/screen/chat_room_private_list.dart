@@ -36,6 +36,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
   String searchKeyword = "";
   String role = '';
   String userId = '';
+  String username = ''; // ✅ username 추가
   late StompClient roomInviteClient;
   bool _isInviteClientConnected = false;
 
@@ -52,10 +53,11 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
     setState(() {
       role = prefs.getString('role') ?? '';
       userId = prefs.getString('userId') ?? '';
+      username = prefs.getString('username') ?? ''; // ✅ username 로드
     });
   }
 
-  // 🔥 안읽은 메시지 개수 및 마지막 메시지 로드
+  // 🔥 안읽은 메시지 개수 및 마지막 메시지 로드 (UnreadMessageManager 사용)
   Future<void> _loadUnreadCounts() async {
     if (allRooms.isEmpty) return;
 
@@ -63,11 +65,11 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       final roomId = room.id.toString();
 
       try {
-        // 안읽은 메시지 개수 조회
+        // 🔥 UnreadMessageManager 사용해서 안읽은 메시지 개수 조회
         final unreadCount =
             await UnreadMessageManager.getPrivateUnreadCount(roomId);
 
-        // 마지막 메시지 정보 조회
+        // 🔥 UnreadMessageManager 사용해서 마지막 메시지 정보 조회
         final lastMessageData =
             await UnreadMessageManager.getPrivateLastMessage(roomId);
 
@@ -83,6 +85,73 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
       } catch (e) {
         print('❌ 방 $roomId 안읽은 메시지 로드 실패: $e');
       }
+    }
+  }
+
+  // ✅ 메시지가 내가 보낸 것인지 체크하는 함수
+  bool _isMyMessage(Map<String, dynamic> messageData) {
+    final sender = messageData['sender'] ?? messageData['senderId'] ?? '';
+    final senderName = messageData['senderName'] ?? '';
+
+    // userId로 체크
+    if (sender.isNotEmpty && sender == userId) {
+      return true;
+    }
+
+    // username으로도 체크
+    if (senderName.isNotEmpty && senderName == username) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // ✅ 새로운 함수: 모든 방의 실시간 메시지 구독
+  void _subscribeToAllRoomMessages() {
+    print('🔔 실시간 메시지 구독 시작 - 방 개수: ${allRooms.length}');
+
+    for (var room in allRooms) {
+      final roomId = room.id.toString();
+      print('📡 방 $roomId 실시간 메시지 구독');
+
+      roomInviteClient.subscribe(
+        destination: '/sub/chat/private/$roomId',
+        callback: (frame) {
+          if (!mounted) return;
+
+          try {
+            final messageData = jsonDecode(frame.body ?? '{}');
+            final sender =
+                messageData['sender'] ?? messageData['senderId'] ?? '';
+            final senderName = messageData['senderName'] ?? '';
+
+            print('🔍 실시간 메시지 수신 - 방: $roomId');
+            print('📤 보낸이: $sender, 보낸이명: $senderName');
+            print('📤 현재유저: $userId, 현재유저명: $username');
+            print('📋 메시지 데이터: $messageData');
+
+            // ✅ 더 엄격한 sender 체크
+            final isMyMessage = _isMyMessage(messageData);
+            print('🔍 내 메시지 여부: $isMyMessage');
+
+            // 내가 보낸 메시지가 아닌 경우에만 안읽은 개수 증가
+            if (!isMyMessage) {
+              setState(() {
+                unreadCounts[roomId] = (unreadCounts[roomId] ?? 0) + 1;
+                lastMessages[roomId] = UnreadMessageManager.cleanMessageText(
+                    messageData['message'] ?? '');
+                lastMessageTimes[roomId] =
+                    UnreadMessageManager.formatTime(messageData['timestamp']);
+              });
+              print('📈 안읽은 메시지 증가: ${unreadCounts[roomId]}');
+            } else {
+              print('🚫 내가 보낸 메시지이므로 안읽은 개수 증가하지 않음');
+            }
+          } catch (e) {
+            print('❌ 실시간 메시지 처리 오류: $e');
+          }
+        },
+      );
     }
   }
 
@@ -132,12 +201,6 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                     lastMessageTimes.remove(deletedRoomId);
                   });
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('채팅방이 삭제되었습니다'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
                   return;
                 }
 
@@ -168,6 +231,38 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                     lastMessages[roomId] = '';
                     lastMessageTimes[roomId] = '';
                     _applyFilter();
+
+                    // ✅ 새 방 추가시 실시간 메시지 구독
+                    roomInviteClient.subscribe(
+                      destination: '/sub/chat/private/$roomId',
+                      callback: (frame) {
+                        if (!mounted) return;
+
+                        try {
+                          final messageData = jsonDecode(frame.body ?? '{}');
+
+                          print('🔍 실시간 메시지 수신 - 새 방: $roomId');
+                          final isMyMessage = _isMyMessage(messageData);
+                          print('🔍 새 방 내 메시지 여부: $isMyMessage');
+
+                          if (!isMyMessage) {
+                            setState(() {
+                              unreadCounts[roomId] =
+                                  (unreadCounts[roomId] ?? 0) + 1;
+                              lastMessages[roomId] =
+                                  UnreadMessageManager.cleanMessageText(
+                                      messageData['message'] ?? '');
+                              lastMessageTimes[roomId] =
+                                  UnreadMessageManager.formatTime(
+                                      messageData['timestamp']);
+                            });
+                            print('📈 새 방 안읽은 메시지 증가: ${unreadCounts[roomId]}');
+                          }
+                        } catch (e) {
+                          print('❌ 새 방 실시간 메시지 처리 오류: $e');
+                        }
+                      },
+                    );
                   }
                 });
 
@@ -204,44 +299,9 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
             },
           );
 
-          // 🔥 실시간 메시지 알림 구독 추가
-          for (var room in allRooms) {
-            final roomId = room.id.toString();
-            roomInviteClient.subscribe(
-              destination: '/sub/chat/private/$roomId',
-              callback: (frame) {
-                if (!mounted) return;
-
-                try {
-                  final messageData = jsonDecode(frame.body ?? '{}');
-                  // ✅ 여러 필드명 확인 및 디버깅 추가
-                  final sender =
-                      messageData['sender'] ?? messageData['senderId'] ?? '';
-
-                  print('🔍 실시간 메시지 수신 - 방: $roomId');
-                  print('📤 보낸이: $sender, 현재유저: $userId');
-                  print('📋 메시지 데이터: $messageData');
-
-                  // 내가 보낸 메시지가 아닌 경우에만 안읽은 개수 증가
-                  if (sender.isNotEmpty && sender != userId) {
-                    setState(() {
-                      unreadCounts[roomId] = (unreadCounts[roomId] ?? 0) + 1;
-                      lastMessages[roomId] =
-                          UnreadMessageManager.cleanMessageText(
-                              messageData['message'] ?? '');
-                      lastMessageTimes[roomId] =
-                          UnreadMessageManager.formatTime(
-                              messageData['timestamp']);
-                    });
-                    print('📈 안읽은 메시지 증가: ${unreadCounts[roomId]}');
-                  } else {
-                    print('🚫 내가 보낸 메시지이므로 안읽은 개수 증가하지 않음');
-                  }
-                } catch (e) {
-                  print('❌ 실시간 메시지 처리 오류: $e');
-                }
-              },
-            );
+          // ✅ WebSocket 연결 후 실시간 메시지 구독 설정
+          if (allRooms.isNotEmpty) {
+            _subscribeToAllRoomMessages();
           }
         },
         onDisconnect: (frame) {
@@ -307,6 +367,11 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
       // 🔥 안읽은 메시지 개수 로드
       await _loadUnreadCounts();
+
+      // ✅ 방 목록 로드 후 실시간 메시지 구독 설정
+      if (_isInviteClientConnected) {
+        _subscribeToAllRoomMessages();
+      }
 
       connectStompForRoomList((roomId, count) {
         setState(() {
@@ -502,9 +567,17 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
               child: const Text("취소"),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(context);
-                Navigator.push(
+
+                // ✅ 채팅방 입장 시 읽음 처리 (UnreadMessageManager 사용)
+                final roomId = existingRoom!.id.toString();
+                await UnreadMessageManager.markAsRead(roomId);
+                setState(() {
+                  unreadCounts[roomId] = 0;
+                });
+
+                final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
@@ -514,6 +587,24 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                     ),
                   ),
                 );
+
+                // ✅ ChatPage에서 돌아왔을 때 결과 처리
+                if (result != null && result['shouldRefresh'] == true) {
+                  final returnedRoomId = result['roomId'];
+                  print('✅ 기존 채팅방에서 돌아옴 - roomId: $returnedRoomId');
+
+                  setState(() {
+                    unreadCounts[returnedRoomId] = 0;
+                  });
+
+                  await Future.delayed(const Duration(milliseconds: 200));
+                  await _loadUnreadCounts();
+                  await _fetchPrivateRooms();
+                } else {
+                  print('🔄 결과 없음 - 전체 새로고침');
+                  await Future.delayed(const Duration(milliseconds: 200));
+                  await _loadUnreadCounts();
+                }
               },
               child: const Text("채팅방 입장"),
             ),
@@ -567,7 +658,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                 );
 
                 Navigator.pop(context);
-                Navigator.push(
+                final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
@@ -577,9 +668,22 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                       isPrivate: true,
                     ),
                   ),
-                ).then((_) {
-                  _fetchPrivateRooms();
-                });
+                );
+
+                // ✅ ChatPage에서 돌아왔을 때 결과 처리
+                if (result != null && result['shouldRefresh'] == true) {
+                  final returnedRoomId = result['roomId'];
+                  print('✅ 새 채팅방에서 돌아옴 - roomId: $returnedRoomId');
+
+                  setState(() {
+                    unreadCounts[returnedRoomId] = 0;
+                  });
+
+                  await Future.delayed(const Duration(milliseconds: 200));
+                  await _fetchPrivateRooms(); // 전체 방 목록 새로고침
+                } else {
+                  await _fetchPrivateRooms(); // 안전하게 전체 새로고침
+                }
               } catch (e) {
                 print('🔍 방 생성 요청2 - createId: $createId');
                 print('❌ 방 생성 오류: $e');
@@ -711,7 +815,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                     unreadCounts[roomId] = 0;
                                   });
 
-                                  Navigator.push(
+                                  final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => ChatPage(
@@ -720,9 +824,31 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                         isPrivate: true,
                                       ),
                                     ),
-                                  ).then((_) {
-                                    _loadUnreadCounts();
-                                  });
+                                  );
+
+                                  // ✅ ChatPage에서 돌아왔을 때 결과 처리 (새로고침 제거)
+                                  if (result != null &&
+                                      result['shouldRefresh'] == true) {
+                                    final returnedRoomId = result['roomId'];
+                                    print(
+                                        '✅ 채팅방에서 돌아옴 - roomId: $returnedRoomId (새로고침 요청됨)');
+
+                                    setState(() {
+                                      unreadCounts[returnedRoomId] = 0;
+                                    });
+
+                                    await Future.delayed(
+                                        const Duration(milliseconds: 200));
+                                    await _loadUnreadCounts();
+                                    await _fetchPrivateRooms();
+                                  } else {
+                                    // 🔥 새로고침 없이 안읽은 개수만 업데이트
+                                    print(
+                                        '✅ 채팅방에서 돌아옴 - roomId: $roomId (새로고침 없음)');
+                                    setState(() {
+                                      unreadCounts[roomId] = 0;
+                                    });
+                                  }
                                 },
                                 child: Card(
                                   elevation: 2,
