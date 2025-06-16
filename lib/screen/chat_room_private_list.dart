@@ -266,32 +266,32 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                   }
                 });
 
-                if (newRoom.createId != currentUserId) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                          '${roomDisplayNames[newRoom.id.toString()] ?? newRoom.name}이 생성되었습니다'),
-                      duration: const Duration(seconds: 3),
-                      action: SnackBarAction(
-                        label: '입장',
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatPage(
-                                roomId: newRoom.id.toString(),
-                                roomName:
-                                    roomDisplayNames[newRoom.id.toString()] ??
-                                        newRoom.name,
-                                isPrivate: true,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  );
-                }
+                // if (newRoom.createId != currentUserId) {
+                //   ScaffoldMessenger.of(context).showSnackBar(
+                //     SnackBar(
+                //       content: Text(
+                //           '${roomDisplayNames[newRoom.id.toString()] ?? newRoom.name}이 생성되었습니다'),
+                //       duration: const Duration(seconds: 3),
+                //       action: SnackBarAction(
+                //         label: '입장',
+                //         onPressed: () {
+                //           Navigator.push(
+                //             context,
+                //             MaterialPageRoute(
+                //               builder: (_) => ChatPage(
+                //                 roomId: newRoom.id.toString(),
+                //                 roomName:
+                //                     roomDisplayNames[newRoom.id.toString()] ??
+                //                         newRoom.name,
+                //                 isPrivate: true,
+                //               ),
+                //             ),
+                //           );
+                //         },
+                //       ),
+                //     ),
+                //   );
+                // }
               } catch (e) {
                 print('❌ 방 알림 파싱 오류: $e');
                 print('📋 받은 데이터: ${frame.body}');
@@ -809,7 +809,7 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
 
                               return GestureDetector(
                                 onTap: () async {
-                                  // 🔥 채팅방 입장 시 읽음 처리
+                                  // 🔥 채팅방 입장 시 읽음 처리 (한 번만!)
                                   await UnreadMessageManager.markAsRead(roomId);
                                   setState(() {
                                     unreadCounts[roomId] = 0;
@@ -826,7 +826,9 @@ class _ChatRoomPrivateListPageState extends State<ChatRoomPrivateListPage> {
                                     ),
                                   );
 
-                                  // ✅ ChatPage에서 돌아왔을 때 결과 처리 (새로고침 제거)
+                                  // 🔥 중복 API 호출 제거됨 - UnreadMessageManager.markAsRead()가 이미 서버 업데이트를 함
+
+                                  // ✅ ChatPage에서 돌아왔을 때 결과 처리
                                   if (result != null &&
                                       result['shouldRefresh'] == true) {
                                     final returnedRoomId = result['roomId'];

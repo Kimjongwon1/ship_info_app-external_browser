@@ -70,7 +70,8 @@ class _ChatPageState extends State<ChatPage> {
 
     Navigator.pop(context, {
       'shouldRefresh': shouldRefresh, // 🔥 선택적 새로고침
-      'roomId': widget.roomId
+      'roomId': widget.roomId,
+      'didRead': true   
     });
   }
 

@@ -3,13 +3,12 @@ import 'package:CHAT_SHIRE/service/chat_api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UnreadMessageManager {
-  static const String _keyPrefix = 'last_read_';
-  static const String _batchKeyPrefix = 'batch_last_read_';
+  // 🔔 오프라인 캐시용 키 (네트워크 장애 시에만 사용)
+  static const String _cachePrefix = 'unread_cache_';
 
-  // 🔑 사용자 ID 저장/조회
   static String? _currentUserId;
 
-  // 현재 로그인한 사용자 ID 설정 (로그인 시 호출)
+  // 현재 로그인한 사용자 ID 설정
   static void setCurrentUserId(String userId) {
     _currentUserId = userId;
     print('✅ 현재 사용자 ID 설정: $userId');
@@ -34,97 +33,58 @@ class UnreadMessageManager {
     return _currentUserId;
   }
 
-  // 🔑 키 생성 함수 (userId_roomId 형태)
-  static String _generateKey(String roomId, String? userId) {
-    final userIdToUse = userId ?? _currentUserId;
-    if (userIdToUse == null) {
-      throw Exception('사용자 ID가 설정되지 않았습니다. setCurrentUserId()를 먼저 호출하세요.');
-    }
-    return '$_keyPrefix${userIdToUse}_$roomId';
-  }
+  // 🔥 ===== 새로운 DB 기반 메서드들 ===== 🔥
 
-  // 🔑 배치 키 생성 함수
-  static String _generateBatchKey(String roomId, String? userId) {
-    final userIdToUse = userId ?? _currentUserId;
-    if (userIdToUse == null) {
-      throw Exception('사용자 ID가 설정되지 않았습니다.');
-    }
-    return '$_batchKeyPrefix${userIdToUse}_$roomId';
-  }
-
-  // 🔔 특정 방의 마지막 읽은 메시지 시간 저장 (기기별)
-  static Future<void> markAsRead(String roomId, {String? userId}) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final key = _generateKey(roomId, userId);
-
-      await prefs.setInt(key, now);
-      print(
-          '✅ 기기별 읽음 처리 - 사용자: ${userId ?? _currentUserId}, 방: $roomId, 시간: $now');
-    } catch (e) {
-      print('❌ 읽음 처리 저장 실패: $e');
-    }
-  }
-
-  // 🔔 특정 방의 마지막 읽은 시간 가져오기 (기기별)
-  static Future<int> getLastReadTime(String roomId, {String? userId}) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = _generateKey(roomId, userId);
-      final result = prefs.getInt(key) ?? 0;
-
-      print(
-          '📖 기기별 읽음 시간 조회 - 사용자: ${userId ?? _currentUserId}, 방: $roomId, 시간: $result');
-      return result;
-    } catch (e) {
-      print('❌ 마지막 읽은 시간 조회 실패: $e');
-      return 0;
-    }
-  }
-
-  // 🔔 안읽은 메시지 개수 계산 (일반 채팅방, 기기별)
-  static Future<int> getUnreadCount(String roomId, {String? userId}) async {
-    try {
-      final lastReadTime = await getLastReadTime(roomId, userId: userId);
-
-      // 서버에서 해당 시간 이후의 메시지 개수를 가져옴
-      final count =
-          await ChatApiService.getUnreadMessageCount(roomId, lastReadTime);
-      return count;
-    } catch (e) {
-      print('❌ 안읽은 메시지 개수 조회 실패: $e');
-      return 0;
-    }
-  }
-
-  // 🔔 안읽은 메시지 개수 계산 (개인 채팅방, 기기별)
+  /// 안읽은 메시지 개수 계산 (개인 채팅방, 서버 DB 기준)
   static Future<int> getPrivateUnreadCount(String roomId,
       {String? userId}) async {
-    try {
-      final lastReadTime = await getLastReadTime(roomId, userId: userId);
-
-      // 개인 채팅방 전용 API 호출
-      final count = await ChatApiService.getPrivateUnreadMessageCount(
-          roomId, lastReadTime);
-      return count;
-    } catch (e) {
-      print('❌ 개인 채팅방 안읽은 메시지 개수 조회 실패: $e');
+    final userIdToUse = userId ?? _currentUserId;
+    if (userIdToUse == null) {
+      print('❌ 사용자 ID가 설정되지 않았습니다.');
       return 0;
     }
-  }
 
-  // 🔔 마지막 메시지 정보 가져오기 (일반 채팅방)
-  static Future<Map<String, dynamic>?> getLastMessage(String roomId) async {
     try {
-      return await ChatApiService.getLastMessage(roomId);
+      // 🔥 서버에 userId와 roomId만 전달 (DB 기준으로 계산)
+      final count = await ChatApiService.getPrivateUnreadMessageCount(
+          roomId, userIdToUse);
+
+      // 🔥 결과를 캐시에 저장 (오프라인 대비)
+      await _cacheUnreadCount(roomId, userIdToUse, count);
+
+      return count;
     } catch (e) {
-      print('❌ 마지막 메시지 조회 실패: $e');
-      return null;
+      print('❌ 서버에서 안읽은 메시지 개수 조회 실패: $e');
+
+      // 🔥 네트워크 오류 시 캐시에서 읽기
+      return await _getCachedUnreadCount(roomId, userIdToUse);
     }
   }
 
-  // 🔔 마지막 메시지 정보 가져오기 (개인 채팅방)
+  /// 읽음 처리 (서버 DB에 업데이트)
+  static Future<void> markAsRead(String roomId, {String? userId}) async {
+    final userIdToUse = userId ?? _currentUserId;
+    if (userIdToUse == null) {
+      print('❌ 사용자 ID가 설정되지 않았습니다.');
+      return;
+    }
+
+    try {
+      // 🔥 서버에 읽음 처리 알림 (DB 업데이트)
+      await ChatApiService.markAsPrivateRead(roomId, userIdToUse);
+
+      // 🔥 성공 시 로컬 캐시도 0으로 설정
+      await _cacheUnreadCount(roomId, userIdToUse, 0);
+
+      print('✅ 읽음 처리 완료 - 사용자: $userIdToUse, 방: $roomId');
+    } catch (e) {
+      print('❌ 읽음 처리 실패: $e');
+      // 🔥 실패해도 로컬에서는 읽음으로 표시 (다음 동기화 때 수정됨)
+      await _cacheUnreadCount(roomId, userIdToUse, 0);
+    }
+  }
+
+  /// 마지막 메시지 정보 가져오기 (개인 채팅방)
   static Future<Map<String, dynamic>?> getPrivateLastMessage(
       String roomId) async {
     try {
@@ -135,64 +95,147 @@ class UnreadMessageManager {
     }
   }
 
-  // 🔔 여러 방의 안읽은 개수 일괄 조회 (성능 최적화, 기기별)
+  /// 여러 방의 안읽은 개수 일괄 조회 (서버 DB 기준)
   static Future<Map<String, int>> getBatchUnreadCounts(List<String> roomIds,
       {String? userId}) async {
-    try {
-      if (roomIds.isEmpty) return {};
+    final userIdToUse = userId ?? _currentUserId;
+    if (userIdToUse == null || roomIds.isEmpty) return {};
 
-      // 각 방의 마지막 읽은 시간 조회 (기기별)
-      Map<String, int> lastReadTimes = {};
-      for (String roomId in roomIds) {
-        lastReadTimes[roomId] = await getLastReadTime(roomId, userId: userId);
+    try {
+      // 🔥 서버에 배치 요청 (userId 기준)
+      final result = await ChatApiService.getBatchPrivateUnreadCounts(
+          roomIds, userIdToUse);
+
+      // 🔥 결과를 캐시에 저장
+      for (final entry in result.entries) {
+        await _cacheUnreadCount(entry.key, userIdToUse, entry.value);
       }
 
-      // 서버에서 배치로 안읽은 개수 조회
-      final unreadCounts = await ChatApiService.getBatchUnreadCounts(roomIds);
-
-      return unreadCounts;
+      return result;
     } catch (e) {
       print('❌ 배치 안읽은 개수 조회 실패: $e');
-      return {};
+
+      // 🔥 실패 시 캐시에서 읽기
+      Map<String, int> cachedResults = {};
+      for (String roomId in roomIds) {
+        cachedResults[roomId] =
+            await _getCachedUnreadCount(roomId, userIdToUse);
+      }
+      return cachedResults;
     }
   }
 
-  // 🔔 특정 사용자의 모든 읽음 상태 삭제 (계정 전환 시 사용)
-  static Future<void> clearUserReadStatus(String userId) async {
+  // 🔔 ===== 호환성을 위한 기존 메서드들 (일반 채팅방용) ===== 🔔
+
+  /// 안읽은 메시지 개수 계산 (일반 채팅방, 기존 방식)
+  static Future<int> getUnreadCount(String roomId, {String? userId}) async {
+    try {
+      final lastReadTime = await getLastReadTime(roomId, userId: userId);
+      final count =
+          await ChatApiService.getUnreadMessageCount(roomId, lastReadTime);
+      return count;
+    } catch (e) {
+      print('❌ 일반 채팅방 안읽은 메시지 개수 조회 실패: $e');
+      return 0;
+    }
+  }
+
+  /// 마지막 메시지 정보 가져오기 (일반 채팅방)
+  static Future<Map<String, dynamic>?> getLastMessage(String roomId) async {
+    try {
+      return await ChatApiService.getLastMessage(roomId);
+    } catch (e) {
+      print('❌ 일반 채팅방 마지막 메시지 조회 실패: $e');
+      return null;
+    }
+  }
+
+  /// 특정 방의 마지막 읽은 시간 가져오기 (기존 방식)
+  static Future<int> getLastReadTime(String roomId, {String? userId}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _generateKey(roomId, userId);
+      final result = prefs.getInt(key) ?? 0;
+      return result;
+    } catch (e) {
+      print('❌ 마지막 읽은 시간 조회 실패: $e');
+      return 0;
+    }
+  }
+
+  // 🔔 ===== 내부 유틸리티 메서드들 ===== 🔔
+
+  /// 오프라인 캐시 저장
+  static Future<void> _cacheUnreadCount(
+      String roomId, String userId, int count) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = '$_cachePrefix${userId}_$roomId';
+      await prefs.setInt(key, count);
+    } catch (e) {
+      print('❌ 캐시 저장 실패: $e');
+    }
+  }
+
+  /// 오프라인 캐시 읽기
+  static Future<int> _getCachedUnreadCount(String roomId, String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = '$_cachePrefix${userId}_$roomId';
+      final cached = prefs.getInt(key) ?? 0;
+      print('📦 캐시에서 안읽은 메시지 개수 조회: $cached');
+      return cached;
+    } catch (e) {
+      print('❌ 캐시 읽기 실패: $e');
+      return 0;
+    }
+  }
+
+  /// 키 생성 함수 (기존 방식용)
+  static String _generateKey(String roomId, String? userId) {
+    final userIdToUse = userId ?? _currentUserId;
+    if (userIdToUse == null) {
+      throw Exception('사용자 ID가 설정되지 않았습니다.');
+    }
+    return 'last_read_${userIdToUse}_$roomId';
+  }
+
+  // 🔔 ===== 캐시 및 데이터 관리 ===== 🔔
+
+  /// 캐시 정리 (로그아웃 시)
+  static Future<void> clearUserCache(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final keys = prefs.getKeys();
 
-      // 해당 사용자의 키만 삭제
       for (String key in keys) {
-        if (key.startsWith('$_keyPrefix$userId') ||
-            key.startsWith('$_batchKeyPrefix$userId')) {
+        if (key.startsWith('$_cachePrefix$userId') ||
+            key.startsWith('last_read_$userId')) {
           await prefs.remove(key);
         }
       }
 
-      print('✅ 사용자 $userId의 읽음 상태 초기화 완료');
+      print('✅ 사용자 $userId의 캐시 정리 완료');
     } catch (e) {
-      print('❌ 사용자 읽음 상태 초기화 실패: $e');
+      print('❌ 캐시 정리 실패: $e');
     }
   }
 
-  // 🔔 현재 사용자의 읽음 상태 초기화 (필요시 사용)
-  static Future<void> clearCurrentUserReadStatus() async {
+  /// 현재 사용자의 캐시 정리
+  static Future<void> clearCurrentUserCache() async {
     if (_currentUserId != null) {
-      await clearUserReadStatus(_currentUserId!);
+      await clearUserCache(_currentUserId!);
     }
   }
 
-  // 🔔 모든 읽음 상태 초기화 (앱 재설치 시 등)
+  /// 모든 읽음 상태 초기화 (앱 재설치 시 등)
   static Future<void> clearAllReadStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final keys = prefs.getKeys();
 
-      // last_read_ 로 시작하는 모든 키 삭제
       for (String key in keys) {
-        if (key.startsWith(_keyPrefix) || key.startsWith(_batchKeyPrefix)) {
+        if (key.startsWith('last_read_') || key.startsWith(_cachePrefix)) {
           await prefs.remove(key);
         }
       }
@@ -203,7 +246,7 @@ class UnreadMessageManager {
     }
   }
 
-  // 🔔 오래된 읽음 상태 정리 (30일 이상 된 데이터 삭제)
+  /// 오래된 읽음 상태 정리 (30일 이상 된 데이터 삭제)
   static Future<void> cleanupOldReadStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -211,23 +254,45 @@ class UnreadMessageManager {
       final thirtyDaysAgo =
           DateTime.now().subtract(Duration(days: 30)).millisecondsSinceEpoch;
 
+      int cleanedCount = 0;
       for (String key in keys) {
-        if (key.startsWith(_keyPrefix)) {
+        if (key.startsWith('last_read_') || key.startsWith(_cachePrefix)) {
           final timestamp = prefs.getInt(key) ?? 0;
           if (timestamp > 0 && timestamp < thirtyDaysAgo) {
             await prefs.remove(key);
-            print('🗑️ 오래된 읽음 상태 삭제: $key');
+            cleanedCount++;
           }
         }
       }
 
-      print('✅ 오래된 읽음 상태 정리 완료');
+      print('✅ 오래된 읽음 상태 정리 완료: $cleanedCount개 삭제');
     } catch (e) {
       print('❌ 오래된 읽음 상태 정리 실패: $e');
     }
   }
 
-  // 🔔 시간 포맷팅 유틸리티
+  /// 동기화 (앱 시작 시 또는 네트워크 복구 시)
+  static Future<void> syncWithServer(List<String> roomIds) async {
+    if (_currentUserId == null) return;
+
+    try {
+      print('🔄 서버와 동기화 시작...');
+      final serverCounts = await getBatchUnreadCounts(roomIds);
+      print('✅ 서버와 동기화 완료: ${serverCounts.length}개 방');
+    } catch (e) {
+      print('❌ 서버와 동기화 실패: $e');
+    }
+  }
+
+  /// 서버와 로컬 읽음 시간 동기화 (ChatPage용 - 호환성)
+  static Future<void> syncReadTimeWithServer(String roomId) async {
+    // 🔥 새로운 방식에서는 서버에 읽음 처리만 하면 됨 (DB에서 관리)
+    await markAsRead(roomId);
+  }
+
+  // 🔔 ===== 유틸리티 함수들 ===== 🔔
+
+  /// 시간 포맷팅 유틸리티
   static String formatTime(dynamic timestamp) {
     try {
       DateTime dateTime;
@@ -259,7 +324,7 @@ class UnreadMessageManager {
     }
   }
 
-  // 🔔 메시지 텍스트 정리 (길이 제한 + 특수문자 처리)
+  /// 메시지 텍스트 정리 (길이 제한 + 특수문자 처리)
   static String cleanMessageText(String message, {int maxLength = 30}) {
     try {
       // 줄바꿈 문자를 공백으로 변경
@@ -283,37 +348,39 @@ class UnreadMessageManager {
     }
   }
 
-  // 🔔 디버깅용 - 특정 사용자의 읽음 상태 출력
-  static Future<void> debugPrintUserReadStatus(String userId) async {
+  // 🔔 ===== 디버깅용 메서드들 ===== 🔔
+
+  /// 캐시 상태 출력 (디버깅용)
+  static Future<void> debugPrintCacheStatus() async {
+    if (_currentUserId == null) {
+      print('❌ 현재 사용자 ID가 설정되지 않았습니다.');
+      return;
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final keys = prefs.getKeys();
 
-      print('=== 사용자 $userId 읽음 상태 ===');
+      print('=== 캐시 상태 (사용자: $_currentUserId) ===');
       for (String key in keys) {
-        if (key.startsWith('$_keyPrefix$userId')) {
+        if (key.startsWith('$_cachePrefix$_currentUserId')) {
           final value = prefs.getInt(key);
-          final roomId = key.replaceFirst('$_keyPrefix$userId', '');
-          final dateTime = DateTime.fromMillisecondsSinceEpoch(value ?? 0);
-          print('방 $roomId: $dateTime');
+          final roomId = key.replaceFirst('$_cachePrefix$_currentUserId', '');
+          print('방 $roomId: $value');
         }
       }
       print('====================');
     } catch (e) {
-      print('❌ 읽음 상태 디버그 출력 실패: $e');
+      print('❌ 캐시 상태 출력 실패: $e');
     }
   }
 
-  // 🔔 디버깅용 - 현재 사용자의 읽음 상태 출력
+  /// 읽음 상태 출력 (디버깅용) - 호환성
   static Future<void> debugPrintCurrentUserReadStatus() async {
-    if (_currentUserId != null) {
-      await debugPrintUserReadStatus(_currentUserId!);
-    } else {
-      print('❌ 현재 사용자 ID가 설정되지 않았습니다.');
-    }
+    await debugPrintCacheStatus();
   }
 
-  // 🔔 디버깅용 - 모든 읽음 상태 출력
+  /// 모든 읽음 상태 출력 (디버깅용)
   static Future<void> debugPrintAllReadStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -321,10 +388,9 @@ class UnreadMessageManager {
 
       print('=== 모든 읽음 상태 ===');
       for (String key in keys) {
-        if (key.startsWith(_keyPrefix)) {
+        if (key.startsWith('last_read_') || key.startsWith(_cachePrefix)) {
           final value = prefs.getInt(key);
-          final dateTime = DateTime.fromMillisecondsSinceEpoch(value ?? 0);
-          print('키: $key, 시간: $dateTime');
+          print('키: $key, 값: $value');
         }
       }
       print('====================');
@@ -333,18 +399,22 @@ class UnreadMessageManager {
     }
   }
 
-  // 🔔 서버와 로컬 읽음 시간 동기화
-  static Future<void> syncReadTimeWithServer(String roomId) async {
-    try {
-      final serverTime = DateTime.now().millisecondsSinceEpoch;
-      final prefs = await SharedPreferences.getInstance();
-      final key = _generateKey(roomId, null);
+  // 🔔 ===== Deprecated 메서드들 (호환성) ===== 🔔
 
-      // 서버 시간으로 강제 업데이트
-      await prefs.setInt(key, serverTime);
-      print('✅ 서버와 읽음 시간 동기화: $roomId → $serverTime');
-    } catch (e) {
-      print('❌ 읽음 시간 동기화 실패: $e');
-    }
+  @deprecated
+  static Future<void> clearUserReadStatus(String userId) async {
+    await clearUserCache(userId);
+  }
+
+  @deprecated
+  static Future<void> clearCurrentUserReadStatus() async {
+    await clearCurrentUserCache();
+  }
+
+  @deprecated
+  static Future<void> debugPrintUserReadStatus(String userId) async {
+    print(
+        '⚠️ Deprecated method: debugPrintUserReadStatus. Use debugPrintCacheStatus instead.');
+    await debugPrintCacheStatus();
   }
 }

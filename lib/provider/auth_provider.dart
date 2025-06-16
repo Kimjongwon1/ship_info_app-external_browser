@@ -140,7 +140,8 @@ class AuthNotifier extends StateNotifier<bool> {
       // 사용자 ID 클리어
       UnreadMessageManager.setCurrentUserId('');
 
-      await prefs.clear();
+      await prefs.remove('userId');
+      await prefs.remove('token');
       state = false;
 
       print('✅ 로그아웃 완료 - 읽음 상태도 초기화됨');
